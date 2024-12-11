@@ -11,6 +11,7 @@ import { UserRole } from '../auth/roles/roles';
 import { TimeReport } from '../types/timeEntry';
 import { convertTimeEntriesToCSV } from '../utils/csvExporter';
 import { sendTimeEntryStatusUpdate } from '../services/emailService';
+import { generateTestWeeklyReport } from '../services/schedulerService';
 
 const router = Router();
 
@@ -294,6 +295,19 @@ router.get('/report',
       return res.json(report);
     } catch (error) {
       return next(error);
+    }
+  }
+);
+
+router.post('/test-weekly-report',
+  requireAuth,
+  requireRole(UserRole.MANAGER),
+  async (_req, res, next) => {
+    try {
+      await generateTestWeeklyReport();
+      res.json({ message: 'Weekly report test triggered successfully' });
+    } catch (error) {
+      next(error);
     }
   }
 );

@@ -79,4 +79,52 @@ export const sendOverdueReminders = async () => {
   } catch (error) {
     console.error('Error sending overdue reminders:', error);
   }
+};
+
+// Add this function for testing
+export const generateTestWeeklyReport = async () => {
+  try {
+    const employeeRepo = AppDataSource.getRepository(Employee);
+    const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
+
+    // Get all managers and admins
+    const managers = await employeeRepo.find({
+      where: [
+        { role: UserRole.MANAGER },
+        { role: UserRole.ADMIN }
+      ]
+    });
+
+    // Calculate date range for the past week
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+
+    console.log(`Generating reports for ${managers.length} managers...`);
+    console.log(`Date range: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
+
+    for (const manager of managers) {
+      console.log(`Processing report for manager: ${manager.email}`);
+      
+      // Get all entries for the past week
+      const entries = await timeEntryRepo.find({
+        where: {
+          clock_in: LessThan(endDate),
+          clock_out: Not(IsNull()),
+          created_at: LessThan(endDate)
+        },
+        relations: ['employee'],
+        order: { clock_in: 'DESC' }
+      });
+
+      console.log(`Found ${entries.length} entries for the period`);
+
+      if (entries.length > 0) {
+        await sendWeeklySummary(manager, entries, startDate, endDate);
+        console.log(`Weekly summary sent to ${manager.email}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error generating test weekly report:', error);
+  }
 }; 
