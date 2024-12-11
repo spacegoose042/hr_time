@@ -4,7 +4,7 @@ import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import { Employee } from '../entities/Employee';
 import AppDataSource from '../db/connection';
 import { ApiError } from './errorHandler';
-import { UserRole, ROLE_HIERARCHY } from '../auth/roles/roles';
+import { UserRole } from '../auth/roles/roles';
 
 interface JwtPayload {
   id: string;
@@ -53,11 +53,12 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
 };
 
 export const requireRole = (role: UserRole) => {
-  return (_req: Request, _res: Response, next: NextFunction) => {
-    passport.authenticate('jwt', { session: false }, (err, user) => {
-      if (err || !user || user.role !== role) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate('jwt', { session: false }, (error: Error | null, user: Employee | false) => {
+      if (error || !user || user.role !== role) {
         return next(new ApiError('Unauthorized', 403));
       }
+      req.user = user;
       next();
     })(req, res, next);
   };

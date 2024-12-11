@@ -6,4 +6,6 @@ declare global {
       user?: Employee;
     }
   }
-} 
+}
+
+export {}; 
