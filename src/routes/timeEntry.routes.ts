@@ -9,6 +9,8 @@ import { ApiError } from '../middleware/errorHandler';
 import { IsNull, In, Not, MoreThanOrEqual, LessThanOrEqual, Between } from 'typeorm';
 import { UserRole } from '../auth/roles/roles';
 import { TimeReport } from '../types/timeEntry';
+import { convertTimeEntriesToCSV } from '../utils/csvExporter';
+import { sendTimeEntryStatusUpdate } from '../services/emailService';
 
 const router = Router();
 
@@ -196,7 +198,6 @@ router.patch('/approve',
         throw new ApiError('One or more time entries not found or already processed', 400);
       }
 
-      // In a real app, verify manager has authority over these employees
       const updatedEntries = await Promise.all(entries.map(async entry => {
         entry.status = status;
         if (notes) {
@@ -204,7 +205,12 @@ router.patch('/approve',
             ? `${entry.notes}\nManager Note (${manager.first_name} ${manager.last_name}): ${notes}`
             : `Manager Note (${manager.first_name} ${manager.last_name}): ${notes}`;
         }
-        return timeEntryRepo.save(entry);
+        const savedEntry = await timeEntryRepo.save(entry);
+        
+        // Send email notification
+        await sendTimeEntryStatusUpdate(savedEntry, status, notes);
+        
+        return savedEntry;
       }));
 
       res.json(updatedEntries);
@@ -225,12 +231,14 @@ router.get('/report',
         startDate, 
         endDate, 
         employeeId, 
-        status 
+        status,
+        format
       } = req.query as { 
         startDate?: string; 
         endDate?: string; 
         employeeId?: string;
         status?: 'pending' | 'approved' | 'rejected';
+        format?: 'json' | 'csv';
       };
 
       const where: any = {};
@@ -256,10 +264,17 @@ router.get('/report',
         order: { clock_in: 'DESC' }
       });
 
+      if (format === 'csv') {
+        const csv = convertTimeEntriesToCSV(entries);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=time-entries.csv');
+        return res.send(csv);
+      }
+
       const totalHours = entries.reduce((total, entry) => {
         if (entry.clock_out) {
           const duration = new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime();
-          return total + (duration / (1000 * 60 * 60)); // Convert to hours
+          return total + (duration / (1000 * 60 * 60));
         }
         return total;
       }, 0);
@@ -276,9 +291,9 @@ router.get('/report',
         summary
       };
 
-      res.json(report);
+      return res.json(report);
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );

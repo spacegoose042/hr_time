@@ -1,0 +1,16 @@
+"ID","Employee Name","Employee Email","Employee Role","Date","Week Number","Month","Year","Clock In","Clock Out","Hours","Status","Notes"
+"7027900b-415b-4653-9dc6-512b74290ec9","John Doe","john@example.com","employee","12/11/2024",50,"December",2024,"12/11/2024, 3:43:29 PM","12/11/2024, 3:43:36 PM",0,"approved","Starting work on the project
+Completed initial phase
+Manager Note (Mike Manager): Hours verified and approved"
+
+SUMMARY
+Total Hours,Total Entries
+0.00,1
+
+HOURS BY EMPLOYEE
+Employee Name,Total Hours
+John Doe,0.00
+
+ENTRIES BY STATUS
+Status,Count
+approved,1
