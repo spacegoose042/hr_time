@@ -2,19 +2,24 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import passport from 'passport';
 import { errorHandler } from './middleware/errorHandler';
 import { setupRoutes } from './routes';
 import { setupDatabase } from './db/connection';
 
+// Load environment variables before using them
 dotenv.config();
 
 const app = express();
+// Log the port to debug
+console.log('Using port:', process.env.PORT);
 const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
+app.use(passport.initialize());
 
 // Setup routes
 setupRoutes(app);

@@ -1,15 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 
-export interface ApiError extends Error {
-  statusCode?: number;
-  errors?: any[];
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public errors?: any[]
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
 }
 
 export const errorHandler = (
   err: ApiError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _next: NextFunction
 ) => {
   const statusCode = err.statusCode || 500;
   
