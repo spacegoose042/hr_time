@@ -8,6 +8,7 @@ import { Employee } from '../entities/Employee';
 import { ApiError } from '../middleware/errorHandler';
 import { IsNull, In, Not, MoreThanOrEqual, LessThanOrEqual, Between } from 'typeorm';
 import { UserRole } from '../auth/roles/roles';
+import { TimeReport } from '../types/timeEntry';
 
 const router = Router();
 
