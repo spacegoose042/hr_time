@@ -7,7 +7,7 @@ export const setupRoutes = (app: Express) => {
   const apiRouter = Router();
 
   // Root route
-  app.get('/', (req, res) => {
+  app.get('/', (_req, res) => {
     res.json({
       message: 'HR Time Clock API',
       version: '1.0.0',
@@ -24,14 +24,17 @@ export const setupRoutes = (app: Express) => {
         time: {
           clockIn: '/api/time/clock-in',
           clockOut: '/api/time/clock-out',
-          entries: '/api/time/entries'
+          entries: '/api/time/entries',
+          pendingApproval: '/api/time/pending-approval',
+          approve: '/api/time/approve',
+          report: '/api/time/report'
         }
       }
     });
   });
 
   // Health check route
-  apiRouter.get('/health', (req, res) => {
+  apiRouter.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
 

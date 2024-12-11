@@ -2,8 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 
 export class ApiError extends Error {
   constructor(
-    message: string,
-    public statusCode: number = 500,
+    public message: string,
+    public statusCode: number,
     public errors?: any[]
   ) {
     super(message);
@@ -11,18 +11,19 @@ export class ApiError extends Error {
   }
 }
 
-export const errorHandler = (
-  err: ApiError,
-  _req: Request,
-  res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _next: NextFunction
-) => {
-  const statusCode = err.statusCode || 500;
-  
-  res.status(statusCode).json({
+export const errorHandler = (error: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(error);
+
+  if (error instanceof ApiError) {
+    return res.status(error.statusCode).json({
+      status: 'error',
+      message: error.message,
+      errors: error.errors
+    });
+  }
+
+  return res.status(500).json({
     status: 'error',
-    message: err.message || 'Internal server error',
-    errors: err.errors || undefined
+    message: 'Internal server error'
   });
 }; 

@@ -2,6 +2,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey } from "typeorm
 
 export class CreateTimeEntries1710100000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TYPE time_entry_status AS ENUM ('pending', 'approved', 'rejected')`);
+        
         await queryRunner.createTable(new Table({
             name: "time_entries",
             columns: [
@@ -31,8 +33,7 @@ export class CreateTimeEntries1710100000000 implements MigrationInterface {
                 },
                 {
                     name: "status",
-                    type: "enum",
-                    enum: ["pending", "approved", "rejected"],
+                    type: "time_entry_status",
                     default: "'pending'"
                 },
                 {
@@ -46,7 +47,7 @@ export class CreateTimeEntries1710100000000 implements MigrationInterface {
                     default: "CURRENT_TIMESTAMP"
                 }
             ]
-        }));
+        }), true);
 
         await queryRunner.createForeignKey("time_entries", new TableForeignKey({
             columnNames: ["employee_id"],
@@ -58,5 +59,6 @@ export class CreateTimeEntries1710100000000 implements MigrationInterface {
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.dropTable("time_entries");
+        await queryRunner.query(`DROP TYPE time_entry_status`);
     }
 } 

@@ -4,9 +4,9 @@
   "description": "HR Time Clock System",
   "main": "src/index.ts",
   "scripts": {
-    "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
+    "start": "node dist/index.js",
     "test": "jest",
     "init-db": "ts-node src/db/init-db.ts",
     "typeorm": "typeorm-ts-node-commonjs"

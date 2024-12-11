@@ -52,19 +52,13 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   })(req, res, next);
 };
 
-export const requireRole = (requiredRole: UserRole) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return next(new ApiError('Unauthorized', 401));
-    }
-
-    const employee = req.user as Employee;
-    const allowedRoles = ROLE_HIERARCHY[employee.role];
-
-    if (!allowedRoles.includes(requiredRole)) {
-      return next(new ApiError('Forbidden - Insufficient permissions', 403));
-    }
-
-    next();
+export const requireRole = (role: UserRole) => {
+  return (_req: Request, _res: Response, next: NextFunction) => {
+    passport.authenticate('jwt', { session: false }, (err, user) => {
+      if (err || !user || user.role !== role) {
+        return next(new ApiError('Unauthorized', 403));
+      }
+      next();
+    })(req, res, next);
   };
 }; 

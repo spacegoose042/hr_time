@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { UserRole } from '../auth/roles/roles';
 import { validateRequest } from '../middleware/validateRequest';
@@ -18,15 +18,15 @@ const updateRoleSchema = z.object({
 });
 
 router.get('/employees', 
-  requireAuth, 
-  requireRole(UserRole.MANAGER), 
-  async (req, res) => {
-    const employeeRepo = AppDataSource.getRepository(Employee);
-    const employees = await employeeRepo.find();
-    res.json(employees.map(emp => {
-      const { password_hash, ...rest } = emp;
-      return rest;
-    }));
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const employees = await AppDataSource.getRepository(Employee).find();
+      res.json(employees);
+    } catch (error) {
+      next(error);
+    }
   }
 );
 
