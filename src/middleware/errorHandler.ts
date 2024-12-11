@@ -1,14 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 
+export interface ApiError extends Error {
+  statusCode?: number;
+  errors?: any[];
+}
+
 export const errorHandler = (
-  err: Error,
+  err: ApiError,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  console.error(err.stack);
-  res.status(500).json({
+  const statusCode = err.statusCode || 500;
+  
+  res.status(statusCode).json({
     status: 'error',
-    message: 'Internal server error'
+    message: err.message || 'Internal server error',
+    errors: err.errors || undefined
   });
 }; 
