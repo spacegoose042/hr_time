@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { UserRole } from '../auth/roles/roles';
 
 @Entity('employees')
 export class Employee {
@@ -17,18 +18,26 @@ export class Employee {
   @Column()
   password_hash: string;
 
-  @Column()
-  hire_date: Date;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.EMPLOYEE
+  })
+  role: UserRole;
 
-  @Column()
-  role: string;
-
-  @Column()
+  @Column({
+    type: 'enum',
+    enum: ['active', 'inactive'],
+    default: 'active'
+  })
   status: string;
 
-  @Column({ name: 'created_at' })
-  createdAt: Date;
+  @Column({ type: 'timestamp' })
+  hire_date: Date;
 
-  @Column({ name: 'updated_at' })
-  updatedAt: Date;
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 } 

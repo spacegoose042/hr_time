@@ -4,11 +4,12 @@ import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import { Employee } from '../entities/Employee';
 import AppDataSource from '../db/connection';
 import { ApiError } from './errorHandler';
+import { UserRole, ROLE_HIERARCHY } from '../auth/roles/roles';
 
 interface JwtPayload {
   id: string;
   email: string;
-  role: string;
+  role: UserRole;
 }
 
 const jwtOptions = {
@@ -51,15 +52,17 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   })(req, res, next);
 };
 
-export const requireRole = (roles: string[]) => {
+export const requireRole = (requiredRole: UserRole) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new ApiError('Unauthorized', 401));
     }
 
     const employee = req.user as Employee;
-    if (!roles.includes(employee.role)) {
-      return next(new ApiError('Forbidden', 403));
+    const allowedRoles = ROLE_HIERARCHY[employee.role];
+
+    if (!allowedRoles.includes(requiredRole)) {
+      return next(new ApiError('Forbidden - Insufficient permissions', 403));
     }
 
     next();

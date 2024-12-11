@@ -5,6 +5,7 @@ import { compare, hash } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 import { ApiError } from '../../middleware/errorHandler';
 import AppDataSource from '../../db/connection';
+import { UserRole } from '../roles/roles';
 
 export class AuthService {
   private employeeRepository: Repository<Employee>;
@@ -49,7 +50,7 @@ export class AuthService {
       password_hash: passwordHash,
       first_name: firstName,
       last_name: lastName,
-      role: 'employee',
+      role: UserRole.EMPLOYEE,
       status: 'active',
       hire_date: new Date()
     });
