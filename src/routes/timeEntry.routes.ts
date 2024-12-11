@@ -6,7 +6,7 @@ import AppDataSource from '../db/connection';
 import { TimeEntry } from '../entities/TimeEntry';
 import { Employee } from '../entities/Employee';
 import { ApiError } from '../middleware/errorHandler';
-import { IsNull, In, Not, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { IsNull, In, Not, MoreThanOrEqual, LessThanOrEqual, Between } from 'typeorm';
 import { UserRole } from '../auth/roles/roles';
 
 const router = Router();
@@ -219,16 +219,7 @@ router.get('/report',
   requireRole(UserRole.MANAGER),
   async (req, res, next) => {
     try {
-      // Test database connection
-      const connected = AppDataSource.isInitialized;
-      console.log('Database connection status:', connected);
-
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
-      
-      // Try a simple query first
-      const count = await timeEntryRepo.count();
-      console.log('Total time entries:', count);
-
       const { 
         startDate, 
         endDate, 
@@ -241,27 +232,22 @@ router.get('/report',
         status?: 'pending' | 'approved' | 'rejected';
       };
 
-      // Add debug logging
-      console.log('Query params:', { startDate, endDate, employeeId, status });
-
       const where: any = {};
 
-      if (startDate) {
-        console.log('Parsing startDate:', startDate);
+      if (startDate && endDate) {
+        where.clock_in = Between(new Date(startDate), new Date(endDate));
+      } else if (startDate) {
         where.clock_in = MoreThanOrEqual(new Date(startDate));
+      } else if (endDate) {
+        where.clock_in = LessThanOrEqual(new Date(endDate));
       }
-      if (endDate) {
-        console.log('Parsing endDate:', endDate);
-        where.clock_out = LessThanOrEqual(new Date(endDate));
-      }
+
       if (employeeId) {
-        where.employee = { id: employeeId };
+        where.employeeId = employeeId;
       }
       if (status) {
         where.status = status;
       }
-
-      console.log('Final where clause:', where);
 
       const entries = await timeEntryRepo.find({
         where,
@@ -269,10 +255,28 @@ router.get('/report',
         order: { clock_in: 'DESC' }
       });
 
-      res.json(entries);
+      const totalHours = entries.reduce((total, entry) => {
+        if (entry.clock_out) {
+          const duration = new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime();
+          return total + (duration / (1000 * 60 * 60)); // Convert to hours
+        }
+        return total;
+      }, 0);
+
+      const summary = {
+        approved: entries.filter(e => e.status === 'approved').length,
+        pending: entries.filter(e => e.status === 'pending').length,
+        rejected: entries.filter(e => e.status === 'rejected').length
+      };
+
+      const report: TimeReport = {
+        totalHours,
+        entries,
+        summary
+      };
+
+      res.json(report);
     } catch (error) {
-      // Add detailed error logging
-      console.error('Error in /report endpoint:', error);
       next(error);
     }
   }
