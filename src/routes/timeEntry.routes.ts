@@ -37,12 +37,15 @@ router.post('/clock-in',
   validateRequest(clockInSchema),
   async (req, res, next) => {
     try {
+      console.log('Clock in request from user:', req.user);
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
 
+      // Check if employee already has an open time entry
+      console.log('Checking for open time entries');
       const openEntry = await timeEntryRepo.findOne({
         where: {
-          employee: { id: employee.id },
+          employeeId: employee.id,
           clock_out: IsNull()
         }
       });
@@ -51,15 +54,22 @@ router.post('/clock-in',
         throw new ApiError('You already have an open time entry', 400);
       }
 
+      console.log('Creating new time entry');
       const timeEntry = timeEntryRepo.create({
+        employeeId: employee.id,
         employee,
         clock_in: new Date(),
-        notes: req.body.notes
+        notes: req.body.notes,
+        status: 'pending'
       });
 
-      await timeEntryRepo.save(timeEntry);
-      res.status(201).json(timeEntry);
+      console.log('Saving time entry');
+      const savedEntry = await timeEntryRepo.save(timeEntry);
+      console.log('Time entry saved:', savedEntry);
+
+      res.status(201).json(savedEntry);
     } catch (error) {
+      console.error('Error in clock-in endpoint:', error);
       next(error);
     }
   }

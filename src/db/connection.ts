@@ -1,32 +1,39 @@
 import { DataSource } from 'typeorm';
-import dotenv from 'dotenv';
-import path from 'path';
 import { Employee } from '../entities/Employee';
 import { TimeEntry } from '../entities/TimeEntry';
 
-dotenv.config();
+console.log('Database config:', {
+  host: process.env.POSTGRES_HOST,
+  port: process.env.POSTGRES_PORT,
+  database: process.env.POSTGRES_DB,
+  username: process.env.POSTGRES_USER
+});
 
 const AppDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'hr_time',
+  host: process.env.POSTGRES_HOST,
+  port: parseInt(process.env.POSTGRES_PORT || '5432'),
+  username: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+  database: process.env.POSTGRES_DB,
   synchronize: false,
-  logging: process.env.NODE_ENV === 'development',
+  logging: true,
   entities: [Employee, TimeEntry],
-  migrations: [path.join(__dirname, '..', 'migrations', '**', '*.ts')],
+  migrations: ['src/migrations/*.ts']
 });
 
-export const setupDatabase = async () => {
-  try {
-    await AppDataSource.initialize();
-    console.log('Database connection established');
-  } catch (error) {
-    console.error('Error connecting to database:', error);
-    throw error;
-  }
-};
+AppDataSource.initialize()
+  .then(() => {
+    console.log('Data Source has been initialized!');
+  })
+  .catch((err) => {
+    console.error('Error during Data Source initialization:', err);
+    console.error('Error details:', {
+      name: err.name,
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    });
+  });
 
 export default AppDataSource; 

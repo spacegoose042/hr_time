@@ -12,7 +12,11 @@ export class ApiError extends Error {
 }
 
 export const errorHandler = (error: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(error);
+  console.error('Error details:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack
+  });
 
   if (error instanceof ApiError) {
     return res.status(error.statusCode).json({
@@ -24,6 +28,7 @@ export const errorHandler = (error: Error, _req: Request, res: Response, _next: 
 
   return res.status(500).json({
     status: 'error',
-    message: 'Internal server error'
+    message: 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? error.message : undefined
   });
 }; 

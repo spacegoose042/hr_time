@@ -14,6 +14,48 @@ export class AuthService {
     this.employeeRepository = AppDataSource.getRepository(Employee);
   }
 
+  async register(registerDto: RegisterDto) {
+    try {
+      console.log('Starting registration for:', registerDto.email);
+      const { email, password, firstName, lastName } = registerDto;
+
+      console.log('Checking for existing employee');
+      const existingEmployee = await this.employeeRepository.findOne({ where: { email } });
+      if (existingEmployee) {
+        throw new ApiError('Email already in use', 400);
+      }
+
+      console.log('Hashing password');
+      const passwordHash = await hash(password, 10);
+
+      console.log('Creating employee');
+      const employee = this.employeeRepository.create({
+        email,
+        password_hash: passwordHash,
+        first_name: firstName,
+        last_name: lastName,
+        role: UserRole.EMPLOYEE,
+        status: 'active',
+        hire_date: new Date()
+      });
+
+      console.log('Saving employee');
+      await this.employeeRepository.save(employee);
+
+      console.log('Generating token');
+      const token = this.generateToken(employee);
+
+      console.log('Registration successful');
+      return {
+        token,
+        employee: this.sanitizeEmployee(employee)
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  }
+
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
@@ -26,36 +68,6 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new ApiError('Invalid credentials', 401);
     }
-
-    const token = this.generateToken(employee);
-
-    return {
-      token,
-      employee: this.sanitizeEmployee(employee)
-    };
-  }
-
-  async register(registerDto: RegisterDto) {
-    const { email, password, firstName, lastName } = registerDto;
-
-    const existingEmployee = await this.employeeRepository.findOne({ where: { email } });
-    if (existingEmployee) {
-      throw new ApiError('Email already in use', 400);
-    }
-
-    const passwordHash = await hash(password, 10);
-
-    const employee = this.employeeRepository.create({
-      email,
-      password_hash: passwordHash,
-      first_name: firstName,
-      last_name: lastName,
-      role: UserRole.EMPLOYEE,
-      status: 'active',
-      hire_date: new Date()
-    });
-
-    await this.employeeRepository.save(employee);
 
     const token = this.generateToken(employee);
 
@@ -81,7 +93,7 @@ export class AuthService {
         role: employee.role
       },
       process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      { expiresIn: '24h' }
     );
   }
 
