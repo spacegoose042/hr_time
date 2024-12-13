@@ -1,4 +1,3 @@
-import { Repository } from 'typeorm';
 import { AuditLog, AuditAction } from '../entities/AuditLog';
 import { Employee } from '../entities/Employee';
 import { TimeEntry } from '../entities/TimeEntry';
