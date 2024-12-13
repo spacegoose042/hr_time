@@ -652,23 +652,7 @@ router.post('/force-close',
 
       const savedEntry = await timeEntryRepo.save(entry);
 
-      // Add debug logging
-      console.log('Creating audit log with:', {
-        actor: manager,
-        timeEntry: savedEntry,
-        action: overrideValidation ? AuditAction.OVERRIDE_VALIDATION : AuditAction.FORCE_CLOSE,
-        changes: {
-          before: originalState,
-          after: savedEntry
-        },
-        reason,
-        overrideDetails: overrideValidation ? {
-          warnings,
-          overrideReason: reason
-        } : undefined
-      });
-
-      // Create audit log
+      // Create audit log with new signature
       await createAuditLog(
         manager,
         savedEntry,
@@ -678,10 +662,15 @@ router.post('/force-close',
           after: savedEntry
         },
         reason,
-        overrideValidation ? {
-          warnings,
-          overrideReason: reason
-        } : undefined
+        req,  // Pass the request object
+        {     // Pass options as an object
+          overrideDetails: overrideValidation ? {
+            warnings,
+            overrideReason: reason
+          } : undefined,
+          tags: ['force-close', overrideValidation ? 'validation-override' : ''],
+          requiresReview: warnings.length > 0
+        }
       );
 
       // Send notification with warnings
