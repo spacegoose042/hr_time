@@ -13,6 +13,9 @@ import { convertTimeEntriesToCSV } from '../utils/csvExporter';
 import { sendTimeEntryStatusUpdate } from '../services/emailService';
 import { generateTestWeeklyReport } from '../services/schedulerService';
 import { Repository } from 'typeorm';
+import { createAuditLog } from '../services/auditService';
+import { AuditAction } from '../entities/AuditLog';
+import { AuditLog } from '../entities/AuditLog';
 
 const router = Router();
 
@@ -626,6 +629,9 @@ router.post('/force-close',
         timeEntryRepo
       );
 
+      // Capture original state for audit
+      const originalState = { ...entry };
+
       // Update the entry
       entry.clock_out = clockOutTime;
       if (breakMinutes !== undefined) {
@@ -642,6 +648,30 @@ router.post('/force-close',
         : `Force closed by ${manager.first_name} ${manager.last_name}\nReason: ${reason}${notes ? `\nNotes: ${notes}` : ''}${warningNotes}`;
 
       const savedEntry = await timeEntryRepo.save(entry);
+
+      // Create audit log
+      await createAuditLog(
+        manager,
+        savedEntry,
+        overrideValidation ? AuditAction.OVERRIDE_VALIDATION : AuditAction.FORCE_CLOSE,
+        {
+          before: {
+            clock_out: originalState.clock_out,
+            break_minutes: originalState.break_minutes,
+            notes: originalState.notes
+          },
+          after: {
+            clock_out: savedEntry.clock_out,
+            break_minutes: savedEntry.break_minutes,
+            notes: savedEntry.notes
+          }
+        },
+        reason,
+        overrideValidation ? {
+          warnings,
+          overrideReason: reason
+        } : undefined
+      );
 
       // Send notification with warnings
       await sendTimeEntryStatusUpdate(
@@ -667,6 +697,41 @@ router.post('/force-close',
         },
         warnings
       });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+// Add an endpoint to view audit logs
+router.get('/audit-logs',
+  requireAuth,
+  requireRole(UserRole.MANAGER),
+  async (req, res, next) => {
+    try {
+      const auditRepo = AppDataSource.getRepository(AuditLog);
+      const { timeEntryId, startDate, endDate } = req.query;
+
+      const query = auditRepo.createQueryBuilder('audit')
+        .leftJoinAndSelect('audit.actor', 'actor')
+        .leftJoinAndSelect('audit.timeEntry', 'timeEntry')
+        .leftJoinAndSelect('timeEntry.employee', 'employee')
+        .orderBy('audit.created_at', 'DESC');
+
+      if (timeEntryId) {
+        query.where('audit.timeEntryId = :timeEntryId', { timeEntryId });
+      }
+
+      if (startDate && endDate) {
+        query.andWhere('audit.created_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate
+        });
+      }
+
+      const logs = await query.getMany();
+
+      return res.json(logs);
     } catch (error) {
       return next(error);
     }
