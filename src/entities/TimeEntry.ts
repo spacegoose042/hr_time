@@ -34,4 +34,16 @@ export class TimeEntry {
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @Column({ type: 'varchar', nullable: true })
+  project: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  task: string;
+
+  @Column({ type: 'int', nullable: true, name: 'break_minutes' })
+  break_minutes: number;
+
+  @Column({ type: 'text', nullable: true, name: 'break_notes' })
+  break_notes: string;
 } 

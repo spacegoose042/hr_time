@@ -51,6 +51,8 @@ export const sendWeeklySummary = async (
   const html = `
     <h2>Weekly Time Entries Summary</h2>
     <p>Period: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}</p>
+    <p>Manager: ${manager.first_name} ${manager.last_name}</p>
+    <p>Total Entries: ${entries.length}</p>
     <p>Please find attached the detailed report.</p>
   `;
 

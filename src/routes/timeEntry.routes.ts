@@ -12,6 +12,7 @@ import { TimeReport } from '../types/timeEntry';
 import { convertTimeEntriesToCSV } from '../utils/csvExporter';
 import { sendTimeEntryStatusUpdate } from '../services/emailService';
 import { generateTestWeeklyReport } from '../services/schedulerService';
+import { Repository } from 'typeorm';
 
 const router = Router();
 
@@ -35,6 +36,59 @@ const approvalSchema = z.object({
   })
 });
 
+const updateCurrentSchema = z.object({
+  body: z.object({
+    notes: z.string().optional(),
+    clockIn: z.string().datetime().optional(),  // ISO datetime string
+    project: z.string().optional(),
+    task: z.string().optional(),
+    breakMinutes: z.number().min(0).max(480).optional(),  // Max 8 hours
+    breakNotes: z.string().optional()
+  })
+});
+
+const forceCloseSchema = z.object({
+  body: z.object({
+    timeEntryId: z.string().uuid(),
+    clockOut: z.string().datetime().optional(), // Optional custom clock-out time
+    notes: z.string().optional(),
+    reason: z.string() // Require a reason for force-closing
+  })
+});
+
+// Add this helper function at the top of the file
+const hasOverlappingEntry = async (
+  timeEntryRepo: Repository<TimeEntry>,
+  employeeId: string,
+  clockIn: Date,
+  clockOut?: Date
+): Promise<boolean> => {
+  // For clock-in, we need to check if there are any entries that:
+  // 1. Have the same employee
+  // 2. Either:
+  //    a. Are still open (no clock_out)
+  //    b. Have a clock_out time that's after our clock_in time
+  const overlappingEntry = await timeEntryRepo.findOne({
+    where: [
+      {
+        employeeId,
+        clock_out: IsNull()
+      },
+      {
+        employeeId,
+        clock_in: LessThanOrEqual(clockIn),
+        clock_out: MoreThanOrEqual(clockIn)
+      },
+      clockOut ? {
+        employeeId,
+        clock_in: Between(clockIn, clockOut)
+      } : {}
+    ]
+  });
+
+  return !!overlappingEntry;
+};
+
 // Clock in
 router.post('/clock-in',
   requireAuth,
@@ -44,25 +98,24 @@ router.post('/clock-in',
       console.log('Clock in request from user:', req.user);
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
+      const clockIn = new Date();
 
-      // Check if employee already has an open time entry
-      console.log('Checking for open time entries');
-      const openEntry = await timeEntryRepo.findOne({
-        where: {
-          employeeId: employee.id,
-          clock_out: IsNull()
-        }
-      });
+      // Check for overlapping entries
+      const hasOverlap = await hasOverlappingEntry(
+        timeEntryRepo,
+        employee.id,
+        clockIn
+      );
 
-      if (openEntry) {
-        throw new ApiError('You already have an open time entry', 400);
+      if (hasOverlap) {
+        throw new ApiError('You have an overlapping time entry', 400);
       }
 
       console.log('Creating new time entry');
       const timeEntry = timeEntryRepo.create({
         employeeId: employee.id,
         employee,
-        clock_in: new Date(),
+        clock_in: clockIn,
         notes: req.body.notes,
         status: 'pending'
       });
@@ -87,10 +140,11 @@ router.post('/clock-out',
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
+      const clockOut = new Date();
 
       const openEntry = await timeEntryRepo.findOne({
         where: {
-          employee: { id: employee.id },
+          employeeId: employee.id,
           clock_out: IsNull()
         }
       });
@@ -99,15 +153,27 @@ router.post('/clock-out',
         throw new ApiError('No open time entry found', 400);
       }
 
-      openEntry.clock_out = new Date();
+      // Check if clock-out time would create an overlap
+      const hasOverlap = await hasOverlappingEntry(
+        timeEntryRepo,
+        employee.id,
+        openEntry.clock_in,
+        clockOut
+      );
+
+      if (hasOverlap) {
+        throw new ApiError('This clock-out time would create an overlapping entry', 400);
+      }
+
+      openEntry.clock_out = clockOut;
       if (req.body.notes) {
         openEntry.notes = openEntry.notes 
           ? `${openEntry.notes}\n${req.body.notes}`
           : req.body.notes;
       }
 
-      await timeEntryRepo.save(openEntry);
-      res.json(openEntry);
+      const savedEntry = await timeEntryRepo.save(openEntry);
+      res.json(savedEntry);
     } catch (error) {
       next(error);
     }
@@ -308,6 +374,218 @@ router.post('/test-weekly-report',
       res.json({ message: 'Weekly report test triggered successfully' });
     } catch (error) {
       next(error);
+    }
+  }
+);
+
+// Add this near your other routes
+router.get('/current',
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
+      const employee = req.user as Employee;
+
+      const openEntry = await timeEntryRepo.findOne({
+        where: {
+          employeeId: employee.id,
+          clock_out: IsNull()
+        },
+        relations: ['employee'],
+        order: { clock_in: 'DESC' }
+      });
+
+      if (!openEntry) {
+        return res.json({ 
+          status: 'not_clocked_in',
+          message: 'No open time entry found',
+          lastEntry: await timeEntryRepo.findOne({
+            where: { employeeId: employee.id },
+            order: { clock_in: 'DESC' },
+            relations: ['employee']
+          })
+        });
+      }
+
+      // Calculate duration so far
+      const now = new Date();
+      const durationMs = now.getTime() - new Date(openEntry.clock_in).getTime();
+      const durationHours = durationMs / (1000 * 60 * 60);
+
+      return res.json({
+        status: 'clocked_in',
+        timeEntry: openEntry,
+        duration: {
+          hours: Number(durationHours.toFixed(2)),
+          minutes: Math.floor((durationMs / (1000 * 60)) % 60),
+          seconds: Math.floor((durationMs / 1000) % 60)
+        }
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+router.patch('/current',
+  requireAuth,
+  validateRequest(updateCurrentSchema),
+  async (req, res, next) => {
+    try {
+      const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
+      const employee = req.user as Employee;
+
+      const openEntry = await timeEntryRepo.findOne({
+        where: {
+          employeeId: employee.id,
+          clock_out: IsNull()
+        },
+        relations: ['employee']
+      });
+
+      if (!openEntry) {
+        throw new ApiError('No open time entry found', 404);
+      }
+
+      // Update notes if provided
+      if (req.body.notes) {
+        openEntry.notes = openEntry.notes
+          ? `${openEntry.notes}\nUpdate: ${req.body.notes}`
+          : req.body.notes;
+      }
+
+      // Update clock-in time if provided (with validation)
+      if (req.body.clockIn) {
+        const newClockIn = new Date(req.body.clockIn);
+        const now = new Date();
+        
+        // Validate new clock-in time
+        if (newClockIn > now) {
+          throw new ApiError('Clock-in time cannot be in the future', 400);
+        }
+
+        // Check for overlaps with the new time
+        const hasOverlap = await hasOverlappingEntry(
+          timeEntryRepo,
+          employee.id,
+          newClockIn
+        );
+
+        if (hasOverlap) {
+          throw new ApiError('This clock-in time would create an overlap', 400);
+        }
+
+        openEntry.clock_in = newClockIn;
+      }
+
+      // Update project/task if provided
+      if (req.body.project) {
+        openEntry.project = req.body.project;
+      }
+      if (req.body.task) {
+        openEntry.task = req.body.task;
+      }
+
+      // Update break time if provided
+      if (req.body.breakMinutes !== undefined) {
+        openEntry.break_minutes = req.body.breakMinutes;
+        if (req.body.breakNotes) {
+          openEntry.break_notes = req.body.breakNotes;
+        }
+      }
+
+      const updatedEntry = await timeEntryRepo.save(openEntry);
+
+      // Calculate duration (excluding break time)
+      const now = new Date();
+      const durationMs = now.getTime() - new Date(updatedEntry.clock_in).getTime();
+      const breakMs = (updatedEntry.break_minutes || 0) * 60 * 1000;
+      const netDurationMs = durationMs - breakMs;
+      const durationHours = netDurationMs / (1000 * 60 * 60);
+
+      return res.json({
+        status: 'updated',
+        timeEntry: updatedEntry,
+        duration: {
+          hours: Number(durationHours.toFixed(2)),
+          minutes: Math.floor((netDurationMs / (1000 * 60)) % 60),
+          seconds: Math.floor((netDurationMs / 1000) % 60),
+          breakMinutes: updatedEntry.break_minutes || 0
+        }
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+router.post('/force-close',
+  requireAuth,
+  requireRole(UserRole.MANAGER), // Only managers can force-close entries
+  validateRequest(forceCloseSchema),
+  async (req, res, next) => {
+    try {
+      const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
+      const manager = req.user as Employee;
+      const { timeEntryId, clockOut, notes, reason } = req.body;
+
+      const entry = await timeEntryRepo.findOne({
+        where: { id: timeEntryId },
+        relations: ['employee']
+      });
+
+      if (!entry) {
+        throw new ApiError('Time entry not found', 404);
+      }
+
+      if (entry.clock_out) {
+        throw new ApiError('Time entry is already closed', 400);
+      }
+
+      // Set clock-out time (use provided time or current time)
+      const clockOutTime = clockOut ? new Date(clockOut) : new Date();
+
+      // Validate clock-out time
+      if (clockOutTime < new Date(entry.clock_in)) {
+        throw new ApiError('Clock-out time cannot be before clock-in time', 400);
+      }
+      if (clockOutTime > new Date()) {
+        throw new ApiError('Clock-out time cannot be in the future', 400);
+      }
+
+      // Update the entry
+      entry.clock_out = clockOutTime;
+      entry.notes = entry.notes
+        ? `${entry.notes}\nForce closed by ${manager.first_name} ${manager.last_name}\nReason: ${reason}${notes ? `\nNotes: ${notes}` : ''}`
+        : `Force closed by ${manager.first_name} ${manager.last_name}\nReason: ${reason}${notes ? `\nNotes: ${notes}` : ''}`;
+
+      const savedEntry = await timeEntryRepo.save(entry);
+
+      // Send notification to the employee
+      await sendTimeEntryStatusUpdate(
+        savedEntry,
+        'force_closed' as any,
+        `Force closed by ${manager.first_name} ${manager.last_name}. Reason: ${reason}`
+      );
+
+      // Calculate duration
+      const durationMs = clockOutTime.getTime() - new Date(entry.clock_in).getTime();
+      const breakMs = (entry.break_minutes || 0) * 60 * 1000;
+      const netDurationMs = durationMs - breakMs;
+      const durationHours = netDurationMs / (1000 * 60 * 60);
+
+      return res.json({
+        status: 'force_closed',
+        timeEntry: savedEntry,
+        duration: {
+          hours: Number(durationHours.toFixed(2)),
+          minutes: Math.floor((netDurationMs / (1000 * 60)) % 60),
+          seconds: Math.floor((netDurationMs / 1000) % 60),
+          breakMinutes: entry.break_minutes || 0
+        }
+      });
+    } catch (error) {
+      return next(error);
     }
   }
 );
