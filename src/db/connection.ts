@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Employee } from '../entities/Employee';
 import { TimeEntry } from '../entities/TimeEntry';
+import { AuditLog } from '../entities/AuditLog';
 import * as dotenv from 'dotenv';
 
 // Load environment variables
@@ -22,7 +23,7 @@ const AppDataSource = new DataSource({
   database: process.env.POSTGRES_DB || 'hr_time',
   synchronize: false,
   logging: true,
-  entities: [Employee, TimeEntry],
+  entities: [Employee, TimeEntry, AuditLog],
   migrations: ['src/migrations/*.ts']
 });
 

@@ -611,12 +611,15 @@ router.post('/force-close',
 
       // Set clock-out time (use provided time or current time)
       const clockOutTime = clockOut ? new Date(clockOut) : new Date();
+      const now = new Date();
+
+      console.log('Current time:', now.toISOString());
+      console.log('Requested clock-out time:', clockOutTime.toISOString());
 
       // Basic time validation
-      if (clockOutTime < new Date(entry.clock_in)) {
-        throw new ApiError('Clock-out time cannot be before clock-in time', 400);
-      }
-      if (clockOutTime > new Date()) {
+      if (clockOutTime > now) {
+        console.log('Clock-out time is in future by:', 
+          (clockOutTime.getTime() - now.getTime()) / 1000, 'seconds');
         throw new ApiError('Clock-out time cannot be in the future', 400);
       }
 
@@ -649,22 +652,30 @@ router.post('/force-close',
 
       const savedEntry = await timeEntryRepo.save(entry);
 
+      // Add debug logging
+      console.log('Creating audit log with:', {
+        actor: manager,
+        timeEntry: savedEntry,
+        action: overrideValidation ? AuditAction.OVERRIDE_VALIDATION : AuditAction.FORCE_CLOSE,
+        changes: {
+          before: originalState,
+          after: savedEntry
+        },
+        reason,
+        overrideDetails: overrideValidation ? {
+          warnings,
+          overrideReason: reason
+        } : undefined
+      });
+
       // Create audit log
       await createAuditLog(
         manager,
         savedEntry,
         overrideValidation ? AuditAction.OVERRIDE_VALIDATION : AuditAction.FORCE_CLOSE,
         {
-          before: {
-            clock_out: originalState.clock_out,
-            break_minutes: originalState.break_minutes,
-            notes: originalState.notes
-          },
-          after: {
-            clock_out: savedEntry.clock_out,
-            break_minutes: savedEntry.break_minutes,
-            notes: savedEntry.notes
-          }
+          before: originalState,
+          after: savedEntry
         },
         reason,
         overrideValidation ? {
@@ -698,6 +709,7 @@ router.post('/force-close',
         warnings
       });
     } catch (error) {
+      console.error('Error in force-close:', error);
       return next(error);
     }
   }
@@ -710,29 +722,28 @@ router.get('/audit-logs',
   async (req, res, next) => {
     try {
       const auditRepo = AppDataSource.getRepository(AuditLog);
-      const { timeEntryId, startDate, endDate } = req.query;
+      const { timeEntryId } = req.query;
+
+      console.log('Fetching audit logs for timeEntryId:', timeEntryId);
 
       const query = auditRepo.createQueryBuilder('audit')
         .leftJoinAndSelect('audit.actor', 'actor')
         .leftJoinAndSelect('audit.timeEntry', 'timeEntry')
-        .leftJoinAndSelect('timeEntry.employee', 'employee')
         .orderBy('audit.created_at', 'DESC');
 
       if (timeEntryId) {
-        query.where('audit.timeEntryId = :timeEntryId', { timeEntryId });
-      }
-
-      if (startDate && endDate) {
-        query.andWhere('audit.created_at BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate
-        });
+        query.where('audit.time_entry_id = :timeEntryId', { timeEntryId });
       }
 
       const logs = await query.getMany();
+      console.log('Found audit logs:', logs);
 
-      return res.json(logs);
+      return res.json({
+        status: 'success',
+        data: logs
+      });
     } catch (error) {
+      console.error('Error fetching audit logs:', error);
       return next(error);
     }
   }

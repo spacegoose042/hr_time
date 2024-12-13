@@ -1,7 +1,7 @@
+import AppDataSource from '../db/connection';
 import { AuditLog, AuditAction } from '../entities/AuditLog';
 import { Employee } from '../entities/Employee';
 import { TimeEntry } from '../entities/TimeEntry';
-import AppDataSource from '../db/connection';
 
 export const createAuditLog = async (
   actor: Employee,
@@ -10,17 +10,17 @@ export const createAuditLog = async (
   changes: any,
   reason: string,
   overrideDetails?: any
-) => {
+): Promise<AuditLog> => {
   const auditRepo = AppDataSource.getRepository(AuditLog);
-  
+
   const auditLog = auditRepo.create({
-    actorId: actor.id,
-    timeEntryId: timeEntry.id,
+    actor_id: actor.id,
+    time_entry_id: timeEntry.id,
     action,
     changes,
     reason,
-    overrideDetails
+    override_details: overrideDetails
   });
 
-  return auditRepo.save(auditLog);
+  return await auditRepo.save(auditLog);
 }; 

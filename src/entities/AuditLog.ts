@@ -13,19 +13,19 @@ export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'actor_id' })
-  actorId: string;
-
-  @ManyToOne(() => Employee)
+  @ManyToOne(() => Employee, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'actor_id' })
   actor: Employee;
 
-  @Column({ name: 'time_entry_id' })
-  timeEntryId: string;
+  @Column('uuid')
+  actor_id: string;
 
-  @ManyToOne(() => TimeEntry)
+  @ManyToOne(() => TimeEntry, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'time_entry_id' })
   timeEntry: TimeEntry;
+
+  @Column('uuid')
+  time_entry_id: string;
 
   @Column({
     type: 'enum',
@@ -33,14 +33,14 @@ export class AuditLog {
   })
   action: AuditAction;
 
-  @Column({ type: 'jsonb' })
+  @Column('jsonb')
   changes: any;
 
-  @Column({ type: 'text' })
+  @Column('text')
   reason: string;
 
-  @Column({ name: 'override_details', type: 'jsonb', nullable: true })
-  overrideDetails: any;
+  @Column('jsonb', { nullable: true })
+  override_details?: any;
 
   @CreateDateColumn()
   created_at: Date;
