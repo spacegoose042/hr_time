@@ -50,9 +50,11 @@ const updateCurrentSchema = z.object({
 const forceCloseSchema = z.object({
   body: z.object({
     timeEntryId: z.string().uuid(),
-    clockOut: z.string().datetime().optional(), // Optional custom clock-out time
+    clockOut: z.string().datetime().optional(),
     notes: z.string().optional(),
-    reason: z.string() // Require a reason for force-closing
+    reason: z.string().min(10).max(500),
+    breakMinutes: z.number().min(0).max(480).optional(),
+    overrideValidation: z.boolean().optional()
   })
 });
 
@@ -87,6 +89,68 @@ const hasOverlappingEntry = async (
   });
 
   return !!overlappingEntry;
+};
+
+// Add validation helper functions
+const isWeekend = (date: Date): boolean => {
+  const day = date.getDay();
+  return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
+};
+
+const isHoliday = (date: Date): boolean => {
+  // Add your holiday logic here
+  const holidays = [
+    '2024-12-25', // Christmas
+    '2024-01-01', // New Year
+    // Add more holidays
+  ];
+  return holidays.includes(date.toISOString().split('T')[0]);
+};
+
+const validateTimeEntry = async (
+  entry: TimeEntry,
+  clockOutTime: Date,
+  breakMinutes: number | undefined,
+  overrideValidation: boolean | undefined,
+  timeEntryRepo: Repository<TimeEntry>
+): Promise<string[]> => {
+  const warnings: string[] = [];
+
+  // Calculate duration
+  const durationMs = clockOutTime.getTime() - new Date(entry.clock_in).getTime();
+  const durationHours = durationMs / (1000 * 60 * 60);
+
+  // 1. Maximum hours validation (12 hours)
+  if (durationHours > 12 && !overrideValidation) {
+    throw new ApiError('Time entry exceeds maximum allowed duration (12 hours)', 400);
+  } else if (durationHours > 8) {
+    warnings.push('Time entry exceeds standard work day (8 hours)');
+  }
+
+  // 2. Break time validation
+  const totalBreakMinutes = (breakMinutes ?? entry.break_minutes ?? 0);
+  if (durationHours >= 6 && totalBreakMinutes < 30 && !overrideValidation) {
+    throw new ApiError('Minimum 30-minute break required for shifts over 6 hours', 400);
+  }
+
+  // 3. Weekend/Holiday validation
+  if (isWeekend(clockOutTime) || isHoliday(clockOutTime)) {
+    warnings.push('Time entry includes weekend/holiday hours');
+  }
+
+  // 4. Check for overlaps with other entries
+  const hasOverlap = await hasOverlappingEntry(
+    timeEntryRepo,
+    entry.employeeId,
+    entry.clock_in,
+    clockOutTime
+  );
+
+  if (hasOverlap && !overrideValidation) {
+    throw new ApiError('This clock-out time would create an overlap with other entries', 400);
+  }
+
+  return warnings;
 };
 
 // Clock in
@@ -521,13 +585,13 @@ router.patch('/current',
 
 router.post('/force-close',
   requireAuth,
-  requireRole(UserRole.MANAGER), // Only managers can force-close entries
+  requireRole(UserRole.MANAGER),
   validateRequest(forceCloseSchema),
   async (req, res, next) => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const manager = req.user as Employee;
-      const { timeEntryId, clockOut, notes, reason } = req.body;
+      const { timeEntryId, clockOut, notes, reason, breakMinutes, overrideValidation } = req.body;
 
       const entry = await timeEntryRepo.findOne({
         where: { id: timeEntryId },
@@ -545,7 +609,7 @@ router.post('/force-close',
       // Set clock-out time (use provided time or current time)
       const clockOutTime = clockOut ? new Date(clockOut) : new Date();
 
-      // Validate clock-out time
+      // Basic time validation
       if (clockOutTime < new Date(entry.clock_in)) {
         throw new ApiError('Clock-out time cannot be before clock-in time', 400);
       }
@@ -553,24 +617,42 @@ router.post('/force-close',
         throw new ApiError('Clock-out time cannot be in the future', 400);
       }
 
+      // Run all validations
+      const warnings = await validateTimeEntry(
+        entry,
+        clockOutTime,
+        breakMinutes,
+        overrideValidation,
+        timeEntryRepo
+      );
+
       // Update the entry
       entry.clock_out = clockOutTime;
+      if (breakMinutes !== undefined) {
+        entry.break_minutes = breakMinutes;
+      }
+
+      // Add warnings to notes if any
+      const warningNotes = warnings.length > 0 
+        ? `\nWarnings:\n${warnings.join('\n')}`
+        : '';
+
       entry.notes = entry.notes
-        ? `${entry.notes}\nForce closed by ${manager.first_name} ${manager.last_name}\nReason: ${reason}${notes ? `\nNotes: ${notes}` : ''}`
-        : `Force closed by ${manager.first_name} ${manager.last_name}\nReason: ${reason}${notes ? `\nNotes: ${notes}` : ''}`;
+        ? `${entry.notes}\nForce closed by ${manager.first_name} ${manager.last_name}\nReason: ${reason}${notes ? `\nNotes: ${notes}` : ''}${warningNotes}`
+        : `Force closed by ${manager.first_name} ${manager.last_name}\nReason: ${reason}${notes ? `\nNotes: ${notes}` : ''}${warningNotes}`;
 
       const savedEntry = await timeEntryRepo.save(entry);
 
-      // Send notification to the employee
+      // Send notification with warnings
       await sendTimeEntryStatusUpdate(
         savedEntry,
         'force_closed' as any,
-        `Force closed by ${manager.first_name} ${manager.last_name}. Reason: ${reason}`
+        `Force closed by ${manager.first_name} ${manager.last_name}. Reason: ${reason}${warningNotes}`
       );
 
       // Calculate duration
       const durationMs = clockOutTime.getTime() - new Date(entry.clock_in).getTime();
-      const breakMs = (entry.break_minutes || 0) * 60 * 1000;
+      const breakMs = (savedEntry.break_minutes || 0) * 60 * 1000;
       const netDurationMs = durationMs - breakMs;
       const durationHours = netDurationMs / (1000 * 60 * 60);
 
@@ -581,8 +663,9 @@ router.post('/force-close',
           hours: Number(durationHours.toFixed(2)),
           minutes: Math.floor((netDurationMs / (1000 * 60)) % 60),
           seconds: Math.floor((netDurationMs / 1000) % 60),
-          breakMinutes: entry.break_minutes || 0
-        }
+          breakMinutes: savedEntry.break_minutes || 0
+        },
+        warnings
       });
     } catch (error) {
       return next(error);
