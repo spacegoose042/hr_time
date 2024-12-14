@@ -59,6 +59,11 @@ const TimeClock: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [filters, setFilters] = useState({
+    startDate: null as Date | null,
+    endDate: null as Date | null,
+    status: ''
+  });
 
   useEffect(() => {
     const checkCurrentStatus = async () => {
@@ -100,8 +105,23 @@ const TimeClock: React.FC = () => {
   const fetchTimeHistory = async () => {
     setIsHistoryLoading(true);
     try {
+      const queryParams = new URLSearchParams({
+        page: (page + 1).toString(),
+        limit: rowsPerPage.toString()
+      });
+
+      if (filters.startDate) {
+        queryParams.append('startDate', filters.startDate.toISOString());
+      }
+      if (filters.endDate) {
+        queryParams.append('endDate', filters.endDate.toISOString());
+      }
+      if (filters.status) {
+        queryParams.append('status', filters.status);
+      }
+
       const response = await fetch(
-        `http://localhost:3002/api/time/entries?page=${page + 1}&limit=${rowsPerPage}`, 
+        `http://localhost:3002/api/time/entries?${queryParams}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -166,7 +186,7 @@ const TimeClock: React.FC = () => {
 
   useEffect(() => {
     fetchTimeHistory();
-  }, [page, rowsPerPage]);
+  }, [page, rowsPerPage, filters]);
 
   const handleClockIn = async () => {
     setError(null);
@@ -308,6 +328,11 @@ const TimeClock: React.FC = () => {
     setPage(0);
   };
 
+  const handleFilterChange = (newFilters: Partial<typeof filters>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+    setPage(0); // Reset to first page when filters change
+  };
+
   if (isInitializing) {
     return (
       <Backdrop open={true} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
@@ -415,6 +440,8 @@ const TimeClock: React.FC = () => {
           isLoading={isHistoryLoading}
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
+          filters={filters}
+          onFilterChange={handleFilterChange}
         />
       </Grid>
     </Grid>

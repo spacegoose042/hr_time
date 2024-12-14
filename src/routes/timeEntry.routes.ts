@@ -265,23 +265,41 @@ router.get('/entries',
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
+      const { page, limit, startDate, endDate, status } = req.query;
 
-      // Get pagination parameters from query
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
-      const skip = (page - 1) * limit;
+      // Parse pagination params with defaults
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = parseInt(limit as string) || 10;
+      const skip = (pageNum - 1) * limitNum;
 
-      // Get total count
+      // Build where clause
+      const whereClause: any = {
+        employeeId: employee.id
+      };
+
+      if (startDate) {
+        whereClause.clock_in = MoreThanOrEqual(new Date(startDate as string));
+      }
+
+      if (endDate) {
+        whereClause.clock_in = LessThanOrEqual(new Date(endDate as string));
+      }
+
+      if (status) {
+        whereClause.status = status;
+      }
+
+      // Get total count with filters
       const total = await timeEntryRepo.count({
-        where: { employeeId: employee.id }
+        where: whereClause
       });
 
-      // Get paginated entries
+      // Get paginated entries with filters
       const entries = await timeEntryRepo.find({
-        where: { employeeId: employee.id },
+        where: whereClause,
         order: { clock_in: 'DESC' },
         skip,
-        take: limit,
+        take: limitNum,
         relations: ['employee']
       });
 
@@ -302,9 +320,9 @@ router.get('/entries',
       res.json({
         entries: entriesWithDuration,
         total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit)
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
       });
     } catch (error) {
       next(error);

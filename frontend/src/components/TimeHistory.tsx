@@ -11,8 +11,16 @@ import {
   Box,
   Chip,
   TablePagination,
-  LinearProgress
+  LinearProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Grid
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 interface TimeEntry {
   id: string;
@@ -33,6 +41,16 @@ interface TimeHistoryProps {
   isLoading?: boolean;
   onPageChange: (newPage: number) => void;
   onRowsPerPageChange: (newRowsPerPage: number) => void;
+  filters: {
+    startDate: Date | null;
+    endDate: Date | null;
+    status: string;
+  };
+  onFilterChange: (filters: {
+    startDate?: Date | null;
+    endDate?: Date | null;
+    status?: string;
+  }) => void;
 }
 
 const TimeHistory: React.FC<TimeHistoryProps> = ({ 
@@ -44,7 +62,9 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
   rowsPerPage,
   isLoading = false,
   onPageChange,
-  onRowsPerPageChange
+  onRowsPerPageChange,
+  filters,
+  onFilterChange
 }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -79,6 +99,46 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
             color="secondary"
           />
         </Box>
+      </Box>
+
+      <Box sx={{ mb: 3 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={3}>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                label="Start Date"
+                value={filters.startDate}
+                onChange={(date) => onFilterChange({ startDate: date })}
+                slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+              />
+            </LocalizationProvider>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                label="End Date"
+                value={filters.endDate}
+                onChange={(date) => onFilterChange({ endDate: date })}
+                slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+              />
+            </LocalizationProvider>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={filters.status}
+                label="Status"
+                onChange={(e) => onFilterChange({ status: e.target.value })}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="approved">Approved</MenuItem>
+                <MenuItem value="rejected">Rejected</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
       </Box>
 
       {isLoading && <LinearProgress sx={{ mb: 2 }} />}
