@@ -36,6 +36,8 @@ import {
   FormGroup,
   FormControlLabel,
   Divider,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -62,6 +64,7 @@ interface TimeEntry {
 
 // Add preset types
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
+type ColumnPreset = 'basic' | 'full' | 'custom';
 
 interface TimeHistoryProps {
   entries: TimeEntry[];
@@ -152,6 +155,7 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
       endDate: null
     }
   });
+  const [columnPreset, setColumnPreset] = useState<ColumnPreset>('full');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -238,6 +242,7 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
   };
 
   const handleColumnToggle = (key: keyof ExportData) => {
+    setColumnPreset('custom');
     setExportOptions(prev => ({
       ...prev,
       columns: prev.columns.map(col => 
@@ -324,6 +329,22 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
       setExportOptionsOpen(false);
       setExportType(null);
     }
+  };
+
+  const handlePresetChange = (_event: React.MouseEvent<HTMLElement>, newPreset: ColumnPreset | null) => {
+    if (!newPreset) return;
+    
+    setColumnPreset(newPreset);
+    setExportOptions(prev => ({
+      ...prev,
+      columns: prev.columns.map(col => ({
+        ...col,
+        selected: newPreset === 'full' || (
+          newPreset === 'basic' && 
+          ['date', 'clock_in_time', 'clock_out_time', 'duration'].includes(col.key)
+        )
+      }))
+    }));
   };
 
   return (
@@ -553,6 +574,27 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
         </DialogTitle>
         <DialogContent>
           <Typography variant="subtitle1" gutterBottom>
+            Column Presets
+          </Typography>
+          <ToggleButtonGroup
+            value={columnPreset}
+            exclusive
+            onChange={handlePresetChange}
+            size="small"
+            sx={{ mb: 2, display: 'flex' }}
+          >
+            <ToggleButton value="basic">
+              Basic
+            </ToggleButton>
+            <ToggleButton value="full">
+              Full
+            </ToggleButton>
+            <ToggleButton value="custom">
+              Custom
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          <Typography variant="subtitle1" gutterBottom>
             Select Columns
           </Typography>
           <FormGroup>
@@ -563,12 +605,32 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
                   <Checkbox
                     checked={col.selected}
                     onChange={() => handleColumnToggle(col.key)}
+                    disabled={columnPreset !== 'custom'}
                   />
                 }
-                label={col.label}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    {col.label}
+                    {columnPreset !== 'custom' && col.selected && (
+                      <Chip
+                        label={columnPreset === 'basic' ? 'Basic' : 'Full'}
+                        size="small"
+                        variant="outlined"
+                        sx={{ ml: 1 }}
+                      />
+                    )}
+                  </Box>
+                }
               />
             ))}
           </FormGroup>
+
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {columnPreset === 'basic' && 'Basic includes date, clock in/out times, and duration'}
+            {columnPreset === 'full' && 'Full includes all available columns'}
+            {columnPreset === 'custom' && 'Select the columns you want to export'}
+          </Typography>
+
           <Divider sx={{ my: 2 }} />
           <Typography variant="subtitle1" gutterBottom>
             Date Range
