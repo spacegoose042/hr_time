@@ -10,8 +10,11 @@ import {
   Grid,
   CircularProgress,
   Backdrop,
-  Alert
+  Alert,
+  Snackbar,
+  IconButton,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface TimeEntry {
   id: string;
@@ -21,6 +24,16 @@ interface TimeEntry {
   status: 'pending' | 'approved' | 'rejected';
 }
 
+interface ApiError {
+  status: string;
+  message: string;
+  errors?: Array<{
+    code: string;
+    message: string;
+    field?: string;
+  }>;
+}
+
 const TimeClock: React.FC = () => {
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<TimeEntry | null>(null);
@@ -28,7 +41,7 @@ const TimeClock: React.FC = () => {
   const [duration, setDuration] = useState('00:00:00');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   useEffect(() => {
     const checkCurrentStatus = async () => {
@@ -39,7 +52,13 @@ const TimeClock: React.FC = () => {
           }
         });
 
-        if (!response.ok) throw new Error('Failed to fetch current status');
+        if (!response.ok) {
+          setError({
+            status: 'error',
+            message: 'Failed to load current status'
+          });
+          throw new Error('Failed to fetch current status');
+        }
 
         const data = await response.json();
         if (data.status === 'clocked_in') {
@@ -49,7 +68,10 @@ const TimeClock: React.FC = () => {
         }
       } catch (error) {
         console.error('Failed to fetch status:', error);
-        setError('Failed to load current status');
+        setError({
+          status: 'error',
+          message: 'Failed to load current status'
+        });
       } finally {
         setIsInitializing(false);
       }
@@ -71,17 +93,29 @@ const TimeClock: React.FC = () => {
         body: JSON.stringify({ notes })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to clock in');
+        throw new Error(JSON.stringify({
+          status: 'error',
+          message: data.message || 'Failed to clock in',
+          errors: data.errors
+        }));
       }
 
-      const data = await response.json();
       setCurrentEntry(data);
       setIsClockedIn(true);
     } catch (error) {
       console.error('Clock in failed:', error);
-      setError(error instanceof Error ? error.message : 'Failed to clock in');
+      try {
+        const errorData: ApiError = JSON.parse(error instanceof Error ? error.message : '{}');
+        setError(errorData);
+      } catch {
+        setError({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Failed to clock in',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -100,9 +134,14 @@ const TimeClock: React.FC = () => {
         body: JSON.stringify({ notes })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to clock out');
+        throw new Error(JSON.stringify({
+          status: 'error',
+          message: data.message || 'Failed to clock out',
+          errors: data.errors
+        }));
       }
 
       setCurrentEntry(null);
@@ -110,7 +149,15 @@ const TimeClock: React.FC = () => {
       setNotes('');
     } catch (error) {
       console.error('Clock out failed:', error);
-      setError(error instanceof Error ? error.message : 'Failed to clock out');
+      try {
+        const errorData: ApiError = JSON.parse(error instanceof Error ? error.message : '{}');
+        setError(errorData);
+      } catch {
+        setError({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Failed to clock out'
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -138,6 +185,30 @@ const TimeClock: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [isClockedIn, currentEntry]);
 
+  const handleErrorClose = () => {
+    setError(null);
+  };
+
+  const getErrorMessage = (error: ApiError) => {
+    if (error.errors && error.errors.length > 0) {
+      return (
+        <Box>
+          <Typography variant="body1" gutterBottom>
+            {error.message}
+          </Typography>
+          <ul style={{ margin: 0, paddingLeft: '20px' }}>
+            {error.errors.map((err, index) => (
+              <li key={index}>
+                {err.field ? `${err.field}: ` : ''}{err.message}
+              </li>
+            ))}
+          </ul>
+        </Box>
+      );
+    }
+    return error.message;
+  };
+
   if (isInitializing) {
     return (
       <Backdrop open={true} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
@@ -148,13 +219,29 @@ const TimeClock: React.FC = () => {
 
   return (
     <Grid container spacing={3}>
-      {error && (
-        <Grid item xs={12}>
-          <Alert severity="error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        </Grid>
-      )}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={handleErrorClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity="error"
+          action={
+            <IconButton
+              size="small"
+              aria-label="close"
+              color="inherit"
+              onClick={handleErrorClose}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          }
+          sx={{ width: '100%', mb: 2 }}
+        >
+          {error && getErrorMessage(error)}
+        </Alert>
+      </Snackbar>
 
       <Grid item xs={12}>
         <Card>
