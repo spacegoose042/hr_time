@@ -38,6 +38,9 @@ import {
   Divider,
   ToggleButton,
   ToggleButtonGroup,
+  IconButton,
+  TextField as MuiTextField,
+  Popover,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -49,6 +52,9 @@ import {
   GetApp as DownloadIcon,
   TableChart as ExcelIcon,
   Description as CsvIcon,
+  Save as SaveIcon,
+  Delete as DeleteIcon,
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -117,6 +123,13 @@ interface ExportOptions {
   };
 }
 
+// Add interface for saved presets
+interface SavedPreset {
+  id: string;
+  name: string;
+  columns: string[];
+}
+
 const TimeHistory: React.FC<TimeHistoryProps> = ({ 
   entries, 
   todayTotal, 
@@ -156,6 +169,13 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
     }
   });
   const [columnPreset, setColumnPreset] = useState<ColumnPreset>('full');
+  const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(() => {
+    const saved = localStorage.getItem('columnPresets');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [presetMenuAnchor, setPresetMenuAnchor] = useState<null | HTMLElement>(null);
+  const [savePresetAnchor, setSavePresetAnchor] = useState<null | HTMLElement>(null);
+  const [newPresetName, setNewPresetName] = useState('');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -345,6 +365,55 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
         )
       }))
     }));
+  };
+
+  const handleSavePreset = () => {
+    if (!newPresetName.trim()) {
+      showNotification('Please enter a preset name', 'error');
+      return;
+    }
+
+    const selectedColumns = exportOptions.columns
+      .filter(col => col.selected)
+      .map(col => col.key);
+
+    if (selectedColumns.length === 0) {
+      showNotification('Please select at least one column', 'error');
+      return;
+    }
+
+    const newPreset: SavedPreset = {
+      id: crypto.randomUUID(),
+      name: newPresetName.trim(),
+      columns: selectedColumns
+    };
+
+    const updatedPresets = [...savedPresets, newPreset];
+    setSavedPresets(updatedPresets);
+    localStorage.setItem('columnPresets', JSON.stringify(updatedPresets));
+    
+    setNewPresetName('');
+    setSavePresetAnchor(null);
+    showNotification('Preset saved successfully', 'success');
+  };
+
+  const handleLoadPreset = (preset: SavedPreset) => {
+    setColumnPreset('custom');
+    setExportOptions(prev => ({
+      ...prev,
+      columns: prev.columns.map(col => ({
+        ...col,
+        selected: preset.columns.includes(col.key)
+      }))
+    }));
+    setPresetMenuAnchor(null);
+  };
+
+  const handleDeletePreset = (presetId: string) => {
+    const updatedPresets = savedPresets.filter(p => p.id !== presetId);
+    setSavedPresets(updatedPresets);
+    localStorage.setItem('columnPresets', JSON.stringify(updatedPresets));
+    showNotification('Preset deleted', 'success');
   };
 
   return (
@@ -576,23 +645,87 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
           <Typography variant="subtitle1" gutterBottom>
             Column Presets
           </Typography>
-          <ToggleButtonGroup
-            value={columnPreset}
-            exclusive
-            onChange={handlePresetChange}
-            size="small"
-            sx={{ mb: 2, display: 'flex' }}
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <ToggleButtonGroup
+              value={columnPreset}
+              exclusive
+              onChange={handlePresetChange}
+              size="small"
+              sx={{ flexGrow: 1 }}
+            >
+              <ToggleButton value="basic">Basic</ToggleButton>
+              <ToggleButton value="full">Full</ToggleButton>
+              <ToggleButton value="custom">Custom</ToggleButton>
+            </ToggleButtonGroup>
+            
+            <IconButton
+              size="small"
+              onClick={(e) => setPresetMenuAnchor(e.currentTarget)}
+              sx={{ ml: 1 }}
+            >
+              <MoreVertIcon />
+            </IconButton>
+          </Box>
+
+          {/* Saved Presets Menu */}
+          <Menu
+            anchorEl={presetMenuAnchor}
+            open={Boolean(presetMenuAnchor)}
+            onClose={() => setPresetMenuAnchor(null)}
           >
-            <ToggleButton value="basic">
-              Basic
-            </ToggleButton>
-            <ToggleButton value="full">
-              Full
-            </ToggleButton>
-            <ToggleButton value="custom">
-              Custom
-            </ToggleButton>
-          </ToggleButtonGroup>
+            {savedPresets.map(preset => (
+              <MuiMenuItem
+                key={preset.id}
+                onClick={() => handleLoadPreset(preset)}
+                sx={{ display: 'flex', justifyContent: 'space-between' }}
+              >
+                <Typography>{preset.name}</Typography>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeletePreset(preset.id);
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </MuiMenuItem>
+            ))}
+            <Divider />
+            <MuiMenuItem onClick={(e) => setSavePresetAnchor(e.currentTarget)}>
+              <SaveIcon fontSize="small" sx={{ mr: 1 }} />
+              Save Current Selection
+            </MuiMenuItem>
+          </Menu>
+
+          {/* Save Preset Popover */}
+          <Popover
+            open={Boolean(savePresetAnchor)}
+            anchorEl={savePresetAnchor}
+            onClose={() => setSavePresetAnchor(null)}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'left',
+            }}
+          >
+            <Box sx={{ p: 2, display: 'flex', alignItems: 'center' }}>
+              <MuiTextField
+                size="small"
+                label="Preset Name"
+                value={newPresetName}
+                onChange={(e) => setNewPresetName(e.target.value)}
+                sx={{ mr: 1 }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleSavePreset}
+                startIcon={<SaveIcon />}
+              >
+                Save
+              </Button>
+            </Box>
+          </Popover>
 
           <Typography variant="subtitle1" gutterBottom>
             Select Columns
