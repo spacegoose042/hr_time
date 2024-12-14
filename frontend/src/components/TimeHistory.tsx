@@ -26,6 +26,8 @@ import {
   ListItemIcon,
   ListItemText,
   CircularProgress,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -82,6 +84,13 @@ interface ExportData extends TimeEntry {
   clock_out_time: string;
 }
 
+// Add this interface for notification state
+interface NotificationState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error';
+}
+
 const TimeHistory: React.FC<TimeHistoryProps> = ({ 
   entries, 
   todayTotal, 
@@ -99,6 +108,11 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
   const [activePreset, setActivePreset] = useState<DatePreset>('custom');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [notification, setNotification] = useState<NotificationState>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -166,6 +180,18 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
     }));
   };
 
+  const handleNotificationClose = () => {
+    setNotification(prev => ({ ...prev, open: false }));
+  };
+
+  const showNotification = (message: string, severity: 'success' | 'error') => {
+    setNotification({
+      open: true,
+      message,
+      severity
+    });
+  };
+
   const exportToCSV = async () => {
     setIsExporting(true);
     try {
@@ -194,9 +220,11 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
       ].join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-      saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
+      await saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
+      showNotification('CSV export successful', 'success');
     } catch (error) {
       console.error('Export failed:', error);
+      showNotification('Failed to export CSV file', 'error');
     } finally {
       setIsExporting(false);
       handleExportClose();
@@ -222,9 +250,11 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
       const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       
-      saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.xlsx`);
+      await saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.xlsx`);
+      showNotification('Excel export successful', 'success');
     } catch (error) {
       console.error('Export failed:', error);
+      showNotification('Failed to export Excel file', 'error');
     } finally {
       setIsExporting(false);
       handleExportClose();
@@ -233,6 +263,22 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
 
   return (
     <Paper sx={{ p: 3 }}>
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={4000}
+        onClose={handleNotificationClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleNotificationClose}
+          severity={notification.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
+
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
         <Typography variant="h6" gutterBottom>
           Time History
