@@ -333,6 +333,15 @@ const TimeClock: React.FC = () => {
     setPage(0); // Reset to first page when filters change
   };
 
+  const handleClearFilters = () => {
+    setFilters({
+      startDate: null,
+      endDate: null,
+      status: ''
+    });
+    setPage(0);
+  };
+
   if (isInitializing) {
     return (
       <Backdrop open={true} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
@@ -442,6 +451,7 @@ const TimeClock: React.FC = () => {
           onRowsPerPageChange={handleRowsPerPageChange}
           filters={filters}
           onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
         />
       </Grid>
     </Grid>

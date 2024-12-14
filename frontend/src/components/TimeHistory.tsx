@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Paper,
   Typography,
@@ -16,11 +16,20 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Grid
+  Grid,
+  Button,
+  ButtonGroup,
+  Stack,
+  Tooltip
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import {
+  Today as TodayIcon,
+  DateRange as DateRangeIcon,
+  Clear as ClearIcon
+} from '@mui/icons-material';
 
 interface TimeEntry {
   id: string;
@@ -30,6 +39,9 @@ interface TimeEntry {
   status: 'pending' | 'approved' | 'rejected';
   duration?: string;
 }
+
+// Add preset types
+type DatePreset = 'today' | 'week' | 'month' | 'custom';
 
 interface TimeHistoryProps {
   entries: TimeEntry[];
@@ -51,6 +63,7 @@ interface TimeHistoryProps {
     endDate?: Date | null;
     status?: string;
   }) => void;
+  onClearFilters: () => void;
 }
 
 const TimeHistory: React.FC<TimeHistoryProps> = ({ 
@@ -64,8 +77,11 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
   onPageChange,
   onRowsPerPageChange,
   filters,
-  onFilterChange
+  onFilterChange,
+  onClearFilters
 }) => {
+  const [activePreset, setActivePreset] = useState<DatePreset>('custom');
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved': return 'success';
@@ -80,6 +96,37 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     onRowsPerPageChange(parseInt(event.target.value, 10));
+  };
+
+  const handlePresetClick = (preset: DatePreset) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+
+    switch (preset) {
+      case 'today':
+        startDate = today;
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'week':
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - today.getDay());
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'month':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+    }
+
+    setActivePreset(preset);
+    onFilterChange({ startDate, endDate });
   };
 
   return (
@@ -103,40 +150,90 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
 
       <Box sx={{ mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={3}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                label="Start Date"
-                value={filters.startDate}
-                onChange={(date) => onFilterChange({ startDate: date })}
-                slotProps={{ textField: { fullWidth: true, size: 'small' } }}
-              />
-            </LocalizationProvider>
+          <Grid item xs={12} md={9}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <ButtonGroup size="small">
+                <Tooltip title="Today">
+                  <Button
+                    variant={activePreset === 'today' ? 'contained' : 'outlined'}
+                    onClick={() => handlePresetClick('today')}
+                    startIcon={<TodayIcon />}
+                  >
+                    Today
+                  </Button>
+                </Tooltip>
+                <Tooltip title="This Week">
+                  <Button
+                    variant={activePreset === 'week' ? 'contained' : 'outlined'}
+                    onClick={() => handlePresetClick('week')}
+                  >
+                    Week
+                  </Button>
+                </Tooltip>
+                <Tooltip title="This Month">
+                  <Button
+                    variant={activePreset === 'month' ? 'contained' : 'outlined'}
+                    onClick={() => handlePresetClick('month')}
+                    startIcon={<DateRangeIcon />}
+                  >
+                    Month
+                  </Button>
+                </Tooltip>
+              </ButtonGroup>
+
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Start Date"
+                  value={filters.startDate}
+                  onChange={(date) => {
+                    setActivePreset('custom');
+                    onFilterChange({ startDate: date });
+                  }}
+                  slotProps={{ textField: { size: 'small' } }}
+                />
+                <DatePicker
+                  label="End Date"
+                  value={filters.endDate}
+                  onChange={(date) => {
+                    setActivePreset('custom');
+                    onFilterChange({ endDate: date });
+                  }}
+                  slotProps={{ textField: { size: 'small' } }}
+                />
+              </LocalizationProvider>
+            </Stack>
           </Grid>
+
           <Grid item xs={12} md={3}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                label="End Date"
-                value={filters.endDate}
-                onChange={(date) => onFilterChange({ endDate: date })}
-                slotProps={{ textField: { fullWidth: true, size: 'small' } }}
-              />
-            </LocalizationProvider>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={filters.status}
-                label="Status"
-                onChange={(e) => onFilterChange({ status: e.target.value })}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="approved">Approved</MenuItem>
-                <MenuItem value="rejected">Rejected</MenuItem>
-              </Select>
-            </FormControl>
+            <Stack direction="row" spacing={1}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={filters.status}
+                  label="Status"
+                  onChange={(e) => onFilterChange({ status: e.target.value })}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="approved">Approved</MenuItem>
+                  <MenuItem value="rejected">Rejected</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Tooltip title="Clear Filters">
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={() => {
+                    setActivePreset('custom');
+                    onClearFilters();
+                  }}
+                  startIcon={<ClearIcon />}
+                >
+                  Clear
+                </Button>
+              </Tooltip>
+            </Stack>
           </Grid>
         </Grid>
       </Box>
