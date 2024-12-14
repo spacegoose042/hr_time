@@ -61,6 +61,16 @@ const forceCloseSchema = z.object({
   })
 });
 
+const entriesQuerySchema = z.object({
+  query: z.object({
+    page: z.string().optional().transform(val => parseInt(val || '1')),
+    limit: z.string().optional().transform(val => parseInt(val || '10')),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    status: z.enum(['pending', 'approved', 'rejected']).optional()
+  })
+});
+
 // Add this helper function at the top of the file
 const hasOverlappingEntry = async (
   timeEntryRepo: Repository<TimeEntry>,
@@ -250,17 +260,52 @@ router.post('/clock-out',
 // Get current user's time entries
 router.get('/entries',
   requireAuth,
+  validateRequest(entriesQuerySchema),
   async (req, res, next) => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
 
-      const entries = await timeEntryRepo.find({
-        where: { employee: { id: employee.id } },
-        order: { clock_in: 'DESC' }
+      // Get pagination parameters from query
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const skip = (page - 1) * limit;
+
+      // Get total count
+      const total = await timeEntryRepo.count({
+        where: { employeeId: employee.id }
       });
 
-      res.json(entries);
+      // Get paginated entries
+      const entries = await timeEntryRepo.find({
+        where: { employeeId: employee.id },
+        order: { clock_in: 'DESC' },
+        skip,
+        take: limit,
+        relations: ['employee']
+      });
+
+      // Calculate duration for each entry
+      const entriesWithDuration = entries.map(entry => {
+        if (entry.clock_out) {
+          const duration = new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime();
+          const hours = Math.floor(duration / (1000 * 60 * 60));
+          const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+          return {
+            ...entry,
+            duration: `${hours}:${minutes.toString().padStart(2, '0')}`
+          };
+        }
+        return entry;
+      });
+
+      res.json({
+        entries: entriesWithDuration,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      });
     } catch (error) {
       next(error);
     }
