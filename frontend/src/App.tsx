@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { theme } from '@/theme';
 import Layout from './components/Layout';
 import TimeClock from './pages/TimeClock';
@@ -13,24 +15,26 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<Layout />}>
-            <Route path="/" element={
-              <PrivateRoute>
-                <TimeClock />
-              </PrivateRoute>
-            } />
-            <Route path="/entries" element={
-              <PrivateRoute>
-                <TimeEntries />
-              </PrivateRoute>
-            } />
-          </Route>
-        </Routes>
-      </Router>
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <CssBaseline />
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route element={<Layout />}>
+              <Route path="/" element={
+                <PrivateRoute>
+                  <TimeClock />
+                </PrivateRoute>
+              } />
+              <Route path="/entries" element={
+                <PrivateRoute>
+                  <TimeEntries />
+                </PrivateRoute>
+              } />
+            </Route>
+          </Routes>
+        </Router>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 };
