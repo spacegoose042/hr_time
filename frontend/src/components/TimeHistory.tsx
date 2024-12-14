@@ -20,7 +20,12 @@ import {
   Button,
   ButtonGroup,
   Stack,
-  Tooltip
+  Tooltip,
+  Menu,
+  MenuItem as MuiMenuItem,
+  ListItemIcon,
+  ListItemText,
+  CircularProgress,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -28,8 +33,13 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import {
   Today as TodayIcon,
   DateRange as DateRangeIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  GetApp as DownloadIcon,
+  TableChart as ExcelIcon,
+  Description as CsvIcon,
 } from '@mui/icons-material';
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 
 interface TimeEntry {
   id: string;
@@ -66,6 +76,12 @@ interface TimeHistoryProps {
   onClearFilters: () => void;
 }
 
+interface ExportData extends TimeEntry {
+  date: string;
+  clock_in_time: string;
+  clock_out_time: string;
+}
+
 const TimeHistory: React.FC<TimeHistoryProps> = ({ 
   entries, 
   todayTotal, 
@@ -81,6 +97,8 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
   onClearFilters
 }) => {
   const [activePreset, setActivePreset] = useState<DatePreset>('custom');
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -129,6 +147,90 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
     onFilterChange({ startDate, endDate });
   };
 
+  const handleExportClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleExportClose = () => {
+    setAnchorEl(null);
+  };
+
+  const formatDataForExport = (): ExportData[] => {
+    return entries.map(entry => ({
+      ...entry,
+      date: new Date(entry.clock_in).toLocaleDateString(),
+      clock_in_time: new Date(entry.clock_in).toLocaleTimeString(),
+      clock_out_time: entry.clock_out 
+        ? new Date(entry.clock_out).toLocaleTimeString()
+        : '---',
+    }));
+  };
+
+  const exportToCSV = async () => {
+    setIsExporting(true);
+    try {
+      const data = formatDataForExport();
+      const headers = [
+        'Date',
+        'Clock In',
+        'Clock Out',
+        'Duration',
+        'Status',
+        'Notes'
+      ];
+      
+      const csvData = data.map(row => [
+        row.date,
+        row.clock_in_time,
+        row.clock_out_time,
+        row.duration || '---',
+        row.status,
+        row.notes || ''
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+      saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExporting(false);
+      handleExportClose();
+    }
+  };
+
+  const exportToExcel = async () => {
+    setIsExporting(true);
+    try {
+      const data = formatDataForExport();
+      const worksheet = XLSX.utils.json_to_sheet(data.map(row => ({
+        Date: row.date,
+        'Clock In': row.clock_in_time,
+        'Clock Out': row.clock_out_time,
+        Duration: row.duration || '---',
+        Status: row.status,
+        Notes: row.notes || ''
+      })));
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Time Entries');
+      
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      
+      saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExporting(false);
+      handleExportClose();
+    }
+  };
+
   return (
     <Paper sx={{ p: 3 }}>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
@@ -144,7 +246,52 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
           <Chip 
             label={`This Week: ${weekTotal}`} 
             color="secondary"
+            sx={{ mr: 1 }}
           />
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleExportClick}
+            size="small"
+          >
+            Export
+          </Button>
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleExportClose}
+          >
+            <MuiMenuItem 
+              onClick={exportToCSV}
+              disabled={isExporting}
+            >
+              <ListItemIcon>
+                {isExporting ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <CsvIcon fontSize="small" />
+                )}
+              </ListItemIcon>
+              <ListItemText>
+                {isExporting ? 'Exporting...' : 'Export to CSV'}
+              </ListItemText>
+            </MuiMenuItem>
+            <MuiMenuItem 
+              onClick={exportToExcel}
+              disabled={isExporting}
+            >
+              <ListItemIcon>
+                {isExporting ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <ExcelIcon fontSize="small" />
+                )}
+              </ListItemIcon>
+              <ListItemText>
+                {isExporting ? 'Exporting...' : 'Export to Excel'}
+              </ListItemText>
+            </MuiMenuItem>
+          </Menu>
         </Box>
       </Box>
 
