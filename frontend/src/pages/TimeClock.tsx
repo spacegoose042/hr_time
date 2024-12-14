@@ -39,6 +39,7 @@ interface TimeHistoryData {
   entries: TimeEntry[];
   todayTotal: string;
   weekTotal: string;
+  totalCount: number;
 }
 
 const TimeClock: React.FC = () => {
@@ -52,8 +53,12 @@ const TimeClock: React.FC = () => {
   const [timeHistory, setTimeHistory] = useState<TimeHistoryData>({
     entries: [],
     todayTotal: '0:00',
-    weekTotal: '0:00'
+    weekTotal: '0:00',
+    totalCount: 0
   });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   useEffect(() => {
     const checkCurrentStatus = async () => {
@@ -93,12 +98,16 @@ const TimeClock: React.FC = () => {
   }, []);
 
   const fetchTimeHistory = async () => {
+    setIsHistoryLoading(true);
     try {
-      const response = await fetch('http://localhost:3002/api/time/entries', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const response = await fetch(
+        `http://localhost:3002/api/time/entries?page=${page + 1}&limit=${rowsPerPage}`, 
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
         }
-      });
+      );
 
       if (!response.ok) throw new Error('Failed to fetch time history');
 
@@ -106,7 +115,7 @@ const TimeClock: React.FC = () => {
       
       // Calculate totals
       const today = new Date().toDateString();
-      const todayEntries = data.filter((entry: TimeEntry) => 
+      const todayEntries = data.entries.filter((entry: TimeEntry) => 
         new Date(entry.clock_in).toDateString() === today
       );
 
@@ -120,7 +129,7 @@ const TimeClock: React.FC = () => {
 
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - 7);
-      const weekEntries = data.filter((entry: TimeEntry) => 
+      const weekEntries = data.entries.filter((entry: TimeEntry) => 
         new Date(entry.clock_in) >= weekStart
       );
 
@@ -133,9 +142,10 @@ const TimeClock: React.FC = () => {
       }, 0);
 
       setTimeHistory({
-        entries: data.slice(0, 10), // Show last 10 entries
+        entries: data.entries,
         todayTotal: formatDuration(todayTotal),
-        weekTotal: formatDuration(weekTotal)
+        weekTotal: formatDuration(weekTotal),
+        totalCount: data.total
       });
     } catch (error) {
       console.error('Failed to fetch time history:', error);
@@ -143,6 +153,8 @@ const TimeClock: React.FC = () => {
         status: 'error',
         message: 'Failed to load time history'
       });
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
 
@@ -154,7 +166,7 @@ const TimeClock: React.FC = () => {
 
   useEffect(() => {
     fetchTimeHistory();
-  }, []);
+  }, [page, rowsPerPage]);
 
   const handleClockIn = async () => {
     setError(null);
@@ -287,6 +299,15 @@ const TimeClock: React.FC = () => {
     return error.message;
   };
 
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    setRowsPerPage(newRowsPerPage);
+    setPage(0);
+  };
+
   if (isInitializing) {
     return (
       <Backdrop open={true} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
@@ -388,6 +409,12 @@ const TimeClock: React.FC = () => {
           entries={timeHistory.entries}
           todayTotal={timeHistory.todayTotal}
           weekTotal={timeHistory.weekTotal}
+          totalCount={timeHistory.totalCount}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          isLoading={isHistoryLoading}
+          onPageChange={handlePageChange}
+          onRowsPerPageChange={handleRowsPerPageChange}
         />
       </Grid>
     </Grid>

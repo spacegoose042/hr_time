@@ -9,7 +9,9 @@ import {
   TableHead,
   TableRow,
   Box,
-  Chip
+  Chip,
+  TablePagination,
+  LinearProgress
 } from '@mui/material';
 
 interface TimeEntry {
@@ -25,15 +27,39 @@ interface TimeHistoryProps {
   entries: TimeEntry[];
   todayTotal: string;
   weekTotal: string;
+  totalCount: number;
+  page: number;
+  rowsPerPage: number;
+  isLoading?: boolean;
+  onPageChange: (newPage: number) => void;
+  onRowsPerPageChange: (newRowsPerPage: number) => void;
 }
 
-const TimeHistory: React.FC<TimeHistoryProps> = ({ entries, todayTotal, weekTotal }) => {
+const TimeHistory: React.FC<TimeHistoryProps> = ({ 
+  entries, 
+  todayTotal, 
+  weekTotal,
+  totalCount,
+  page,
+  rowsPerPage,
+  isLoading = false,
+  onPageChange,
+  onRowsPerPageChange
+}) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved': return 'success';
       case 'rejected': return 'error';
       default: return 'warning';
     }
+  };
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    onPageChange(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onRowsPerPageChange(parseInt(event.target.value, 10));
   };
 
   return (
@@ -54,6 +80,8 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({ entries, todayTotal, weekTota
           />
         </Box>
       </Box>
+
+      {isLoading && <LinearProgress sx={{ mb: 2 }} />}
 
       <TableContainer>
         <Table size="small">
@@ -99,6 +127,16 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({ entries, todayTotal, weekTota
           </TableBody>
         </Table>
       </TableContainer>
+
+      <TablePagination
+        component="div"
+        count={totalCount}
+        page={page}
+        onPageChange={handleChangePage}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        rowsPerPageOptions={[5, 10, 25, 50]}
+      />
     </Paper>
   );
 };
