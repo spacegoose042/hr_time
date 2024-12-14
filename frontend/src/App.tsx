@@ -6,6 +6,9 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { theme } from '@/theme';
 import Layout from './components/Layout';
 import TimeClock from './pages/TimeClock';
+import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // Temporary placeholder components
 const Login = () => <div>Login</div>;
@@ -20,6 +23,9 @@ const App: React.FC = () => {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route element={<Layout />}>
               <Route path="/" element={
                 <PrivateRoute>

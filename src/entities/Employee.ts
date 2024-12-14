@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { UserRole } from '../auth/roles/roles';
+import { PasswordHistory } from './PasswordHistory';
 
 @Entity('employees')
 export class Employee {
@@ -40,4 +41,13 @@ export class Employee {
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @Column({ nullable: true })
+  reset_token: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  reset_token_expires: Date | null;
+
+  @OneToMany(() => PasswordHistory, history => history.employee)
+  passwordHistory: PasswordHistory[];
 } 
