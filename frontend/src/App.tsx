@@ -3,10 +3,10 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { theme } from '@/theme';
 import Layout from './components/Layout';
+import TimeClock from './pages/TimeClock';
 
 // Temporary placeholder components
 const Login = () => <div>Login</div>;
-const TimeClock = () => <div>TimeClock</div>;
 const TimeEntries = () => <div>TimeEntries</div>;
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => <>{children}</>;
 
