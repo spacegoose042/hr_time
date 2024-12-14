@@ -7,7 +7,10 @@ import {
   Box,
   Card,
   CardContent,
-  Grid
+  Grid,
+  CircularProgress,
+  Backdrop,
+  Alert
 } from '@mui/material';
 
 interface TimeEntry {
@@ -23,31 +26,70 @@ const TimeClock: React.FC = () => {
   const [currentEntry, setCurrentEntry] = useState<TimeEntry | null>(null);
   const [notes, setNotes] = useState('');
   const [duration, setDuration] = useState('00:00:00');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkCurrentStatus = async () => {
+      try {
+        const response = await fetch('http://localhost:3002/api/time/current', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch current status');
+
+        const data = await response.json();
+        if (data.status === 'clocked_in') {
+          setCurrentEntry(data.timeEntry);
+          setIsClockedIn(true);
+          setNotes(data.timeEntry.notes || '');
+        }
+      } catch (error) {
+        console.error('Failed to fetch status:', error);
+        setError('Failed to load current status');
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    checkCurrentStatus();
+  }, []);
 
   const handleClockIn = async () => {
+    setError(null);
+    setIsLoading(true);
     try {
       const response = await fetch('http://localhost:3002/api/time/clock-in', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Add your auth token here
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({ notes })
       });
 
-      if (!response.ok) throw new Error('Failed to clock in');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to clock in');
+      }
 
       const data = await response.json();
       setCurrentEntry(data);
       setIsClockedIn(true);
     } catch (error) {
       console.error('Clock in failed:', error);
-      // Add error handling here
+      setError(error instanceof Error ? error.message : 'Failed to clock in');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleClockOut = async () => {
+    setError(null);
+    setIsLoading(true);
     try {
       const response = await fetch('http://localhost:3002/api/time/clock-out', {
         method: 'POST',
@@ -58,18 +100,22 @@ const TimeClock: React.FC = () => {
         body: JSON.stringify({ notes })
       });
 
-      if (!response.ok) throw new Error('Failed to clock out');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to clock out');
+      }
 
       setCurrentEntry(null);
       setIsClockedIn(false);
       setNotes('');
     } catch (error) {
       console.error('Clock out failed:', error);
-      // Add error handling here
+      setError(error instanceof Error ? error.message : 'Failed to clock out');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Update timer every second when clocked in
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
@@ -92,8 +138,24 @@ const TimeClock: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [isClockedIn, currentEntry]);
 
+  if (isInitializing) {
+    return (
+      <Backdrop open={true} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <CircularProgress color="inherit" />
+      </Backdrop>
+    );
+  }
+
   return (
     <Grid container spacing={3}>
+      {error && (
+        <Grid item xs={12}>
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        </Grid>
+      )}
+
       <Grid item xs={12}>
         <Card>
           <CardContent>
@@ -112,15 +174,20 @@ const TimeClock: React.FC = () => {
 
       <Grid item xs={12} md={6}>
         <Paper sx={{ p: 3 }}>
-          <Box sx={{ mb: 3 }}>
+          <Box sx={{ mb: 3, position: 'relative' }}>
             <Button 
               variant="contained" 
               color={isClockedIn ? "secondary" : "primary"}
               size="large" 
               fullWidth
               onClick={isClockedIn ? handleClockOut : handleClockIn}
+              disabled={isLoading}
             >
-              {isClockedIn ? 'Clock Out' : 'Clock In'}
+              {isLoading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                isClockedIn ? 'Clock Out' : 'Clock In'
+              )}
             </Button>
           </Box>
           <TextField
@@ -132,6 +199,7 @@ const TimeClock: React.FC = () => {
             placeholder="Enter any notes about your work session..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            disabled={isLoading}
           />
         </Paper>
       </Grid>
