@@ -41,6 +41,8 @@ import {
   IconButton,
   TextField as MuiTextField,
   Popover,
+  List,
+  ListItem,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -55,6 +57,8 @@ import {
   Save as SaveIcon,
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
+  Add as AddIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -127,7 +131,26 @@ interface ExportOptions {
 interface SavedPreset {
   id: string;
   name: string;
+  description: string;
   columns: string[];
+  tags: string[];
+  createdAt: string;
+  lastUsed: string;
+  isShared: boolean;
+  owner: string;  // user email or id
+}
+
+// Add new interfaces
+interface PresetExport {
+  version: string;
+  presets: SavedPreset[];
+  exportedAt: string;
+}
+
+interface PresetTag {
+  id: string;
+  name: string;
+  color: string;
 }
 
 const TimeHistory: React.FC<TimeHistoryProps> = ({ 
@@ -176,6 +199,17 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
   const [presetMenuAnchor, setPresetMenuAnchor] = useState<null | HTMLElement>(null);
   const [savePresetAnchor, setSavePresetAnchor] = useState<null | HTMLElement>(null);
   const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetDescription, setNewPresetDescription] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [presetDialogOpen, setPresetDialogOpen] = useState(false);
+  const [presetTags, setPresetTags] = useState<PresetTag[]>(() => {
+    const saved = localStorage.getItem('presetTags');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', name: 'Favorites', color: '#FFD700' },
+      { id: '2', name: 'Work', color: '#90CAF9' },
+      { id: '3', name: 'Personal', color: '#81C784' }
+    ];
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -377,15 +411,16 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
       .filter(col => col.selected)
       .map(col => col.key);
 
-    if (selectedColumns.length === 0) {
-      showNotification('Please select at least one column', 'error');
-      return;
-    }
-
     const newPreset: SavedPreset = {
       id: crypto.randomUUID(),
       name: newPresetName.trim(),
-      columns: selectedColumns
+      description: newPresetDescription,
+      columns: selectedColumns,
+      tags: selectedTags,
+      createdAt: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+      isShared: false,
+      owner: 'current-user@example.com'  // Replace with actual user info
     };
 
     const updatedPresets = [...savedPresets, newPreset];
@@ -393,6 +428,8 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
     localStorage.setItem('columnPresets', JSON.stringify(updatedPresets));
     
     setNewPresetName('');
+    setNewPresetDescription('');
+    setSelectedTags([]);
     setSavePresetAnchor(null);
     showNotification('Preset saved successfully', 'success');
   };
@@ -414,6 +451,76 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
     setSavedPresets(updatedPresets);
     localStorage.setItem('columnPresets', JSON.stringify(updatedPresets));
     showNotification('Preset deleted', 'success');
+  };
+
+  const handleExportPresets = () => {
+    const exportData: PresetExport = {
+      version: '1.0',
+      presets: savedPresets,
+      exportedAt: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    saveAs(blob, `time-entry-presets-${new Date().toISOString().split('T')[0]}.json`);
+  };
+
+  const handleImportPresets = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const importData: PresetExport = JSON.parse(text);
+
+      // Validate import data
+      if (!importData.version || !Array.isArray(importData.presets)) {
+        throw new Error('Invalid preset file format');
+      }
+
+      // Merge with existing presets
+      const updatedPresets = [
+        ...savedPresets,
+        ...importData.presets.map(preset => ({
+          ...preset,
+          id: crypto.randomUUID(), // Generate new IDs for imported presets
+          isShared: true,
+          lastUsed: new Date().toISOString()
+        }))
+      ];
+
+      setSavedPresets(updatedPresets);
+      localStorage.setItem('columnPresets', JSON.stringify(updatedPresets));
+      showNotification('Presets imported successfully', 'success');
+    } catch (error) {
+      console.error('Import failed:', error);
+      showNotification('Failed to import presets', 'error');
+    }
+  };
+
+  const handleDeleteTag = (tagId: string) => {
+    const updatedTags = presetTags.filter(tag => tag.id !== tagId);
+    setPresetTags(updatedTags);
+    localStorage.setItem('presetTags', JSON.stringify(updatedTags));
+    
+    // Also update any presets that use this tag
+    const updatedPresets = savedPresets.map(preset => ({
+      ...preset,
+      tags: preset.tags.filter(id => id !== tagId)
+    }));
+    setSavedPresets(updatedPresets);
+    localStorage.setItem('columnPresets', JSON.stringify(updatedPresets));
+  };
+
+  const handleAddTag = () => {
+    const newTag: PresetTag = {
+      id: crypto.randomUUID(),
+      name: `Tag ${presetTags.length + 1}`,
+      color: `#${Math.floor(Math.random()*16777215).toString(16)}`
+    };
+    
+    const updatedTags = [...presetTags, newTag];
+    setPresetTags(updatedTags);
+    localStorage.setItem('presetTags', JSON.stringify(updatedTags));
   };
 
   return (
@@ -807,6 +914,115 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
             {isExporting ? 'Exporting...' : 'Export'}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Preset Management Dialog */}
+      <Dialog
+        open={presetDialogOpen}
+        onClose={() => setPresetDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Manage Presets
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2}>
+            {/* Tags Management */}
+            <Grid item xs={12} md={4}>
+              <Typography variant="subtitle2" gutterBottom>
+                Tags
+              </Typography>
+              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                {presetTags.map(tag => (
+                  <Chip
+                    key={tag.id}
+                    label={tag.name}
+                    sx={{ m: 0.5, bgcolor: tag.color }}
+                    onDelete={() => handleDeleteTag(tag.id)}
+                  />
+                ))}
+                <Button
+                  startIcon={<AddIcon />}
+                  size="small"
+                  onClick={handleAddTag}
+                  sx={{ mt: 1 }}
+                >
+                  Add Tag
+                </Button>
+              </Paper>
+            </Grid>
+
+            {/* Presets List */}
+            <Grid item xs={12} md={8}>
+              <Typography variant="subtitle2" gutterBottom>
+                Saved Presets
+              </Typography>
+              <List>
+                {savedPresets.map(preset => (
+                  <ListItem
+                    key={preset.id}
+                    secondaryAction={
+                      <IconButton edge="end" onClick={() => handleDeletePreset(preset.id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemText
+                      primary={preset.name}
+                      secondary={
+                        <>
+                          <Typography variant="caption" display="block">
+                            {preset.description}
+                          </Typography>
+                          <Box sx={{ mt: 0.5 }}>
+                            {preset.tags.map(tagId => {
+                              const tag = presetTags.find(t => t.id === tagId);
+                              return tag ? (
+                                <Chip
+                                  key={tagId}
+                                  label={tag.name}
+                                  size="small"
+                                  sx={{ mr: 0.5, bgcolor: tag.color }}
+                                />
+                              ) : null;
+                            })}
+                          </Box>
+                        </>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Grid>
+
+            {/* Import/Export Buttons */}
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadIcon />}
+                  component="label"
+                >
+                  Import Presets
+                  <input
+                    type="file"
+                    hidden
+                    accept=".json"
+                    onChange={handleImportPresets}
+                  />
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleExportPresets}
+                >
+                  Export Presets
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+        </DialogContent>
       </Dialog>
     </Paper>
   );
