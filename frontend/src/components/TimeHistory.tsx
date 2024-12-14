@@ -28,6 +28,14 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Checkbox,
+  FormGroup,
+  FormControlLabel,
+  Divider,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -91,6 +99,21 @@ interface NotificationState {
   severity: 'success' | 'error';
 }
 
+// Add interfaces for export options
+interface ExportColumn {
+  key: keyof ExportData;
+  label: string;
+  selected: boolean;
+}
+
+interface ExportOptions {
+  columns: ExportColumn[];
+  dateRange: {
+    startDate: Date | null;
+    endDate: Date | null;
+  };
+}
+
 const TimeHistory: React.FC<TimeHistoryProps> = ({ 
   entries, 
   todayTotal, 
@@ -112,6 +135,22 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
     open: false,
     message: '',
     severity: 'success'
+  });
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false);
+  const [exportType, setExportType] = useState<'csv' | 'excel' | null>(null);
+  const [exportOptions, setExportOptions] = useState<ExportOptions>({
+    columns: [
+      { key: 'date', label: 'Date', selected: true },
+      { key: 'clock_in_time', label: 'Clock In', selected: true },
+      { key: 'clock_out_time', label: 'Clock Out', selected: true },
+      { key: 'duration', label: 'Duration', selected: true },
+      { key: 'status', label: 'Status', selected: true },
+      { key: 'notes', label: 'Notes', selected: true }
+    ],
+    dateRange: {
+      startDate: null,
+      endDate: null
+    }
   });
 
   const getStatusColor = (status: string) => {
@@ -192,72 +231,98 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
     });
   };
 
-  const exportToCSV = async () => {
-    setIsExporting(true);
-    try {
-      const data = formatDataForExport();
-      const headers = [
-        'Date',
-        'Clock In',
-        'Clock Out',
-        'Duration',
-        'Status',
-        'Notes'
-      ];
-      
-      const csvData = data.map(row => [
-        row.date,
-        row.clock_in_time,
-        row.clock_out_time,
-        row.duration || '---',
-        row.status,
-        row.notes || ''
-      ]);
-
-      const csvContent = [
-        headers.join(','),
-        ...csvData.map(row => row.join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-      await saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
-      showNotification('CSV export successful', 'success');
-    } catch (error) {
-      console.error('Export failed:', error);
-      showNotification('Failed to export CSV file', 'error');
-    } finally {
-      setIsExporting(false);
-      handleExportClose();
-    }
+  const handleExportOptionClick = (type: 'csv' | 'excel') => {
+    setExportType(type);
+    setExportOptionsOpen(true);
+    handleExportClose();
   };
 
-  const exportToExcel = async () => {
+  const handleColumnToggle = (key: keyof ExportData) => {
+    setExportOptions(prev => ({
+      ...prev,
+      columns: prev.columns.map(col => 
+        col.key === key ? { ...col, selected: !col.selected } : col
+      )
+    }));
+  };
+
+  const handleExportDateChange = (type: 'startDate' | 'endDate', date: Date | null) => {
+    setExportOptions(prev => ({
+      ...prev,
+      dateRange: {
+        ...prev.dateRange,
+        [type]: date
+      }
+    }));
+  };
+
+  const handleExport = async () => {
+    if (!exportType) {
+      showNotification('Export type not selected', 'error');
+      return;
+    }
+
+    const selectedColumns = exportOptions.columns.filter(col => col.selected);
+    if (selectedColumns.length === 0) {
+      showNotification('Please select at least one column to export', 'error');
+      return;
+    }
+
     setIsExporting(true);
     try {
-      const data = formatDataForExport();
-      const worksheet = XLSX.utils.json_to_sheet(data.map(row => ({
-        Date: row.date,
-        'Clock In': row.clock_in_time,
-        'Clock Out': row.clock_out_time,
-        Duration: row.duration || '---',
-        Status: row.status,
-        Notes: row.notes || ''
-      })));
+      const data = formatDataForExport().filter(entry => {
+        const entryDate = new Date(entry.clock_in);
+        const { startDate, endDate } = exportOptions.dateRange;
+        
+        if (startDate && entryDate < startDate) return false;
+        if (endDate) {
+          const endOfDay = new Date(endDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (entryDate > endOfDay) return false;
+        }
+        return true;
+      });
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Time Entries');
-      
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      
-      await saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.xlsx`);
-      showNotification('Excel export successful', 'success');
+      if (exportType === 'csv') {
+        const headers = selectedColumns.map(col => col.label);
+        const csvData = data.map(row => 
+          selectedColumns.map(col => row[col.key]?.toString() || '')
+        );
+
+        const csvContent = [
+          headers.join(','),
+          ...csvData.map(row => row.join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+        await saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
+      } else {
+        const worksheet = XLSX.utils.json_to_sheet(
+          data.map(row => {
+            const exportRow: Record<string, any> = {};
+            selectedColumns.forEach(col => {
+              exportRow[col.label] = row[col.key];
+            });
+            return exportRow;
+          })
+        );
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Time Entries');
+        
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        await saveAs(blob, `time-entries-${new Date().toISOString().split('T')[0]}.xlsx`);
+      }
+
+      showNotification(`${exportType.toUpperCase()} export successful`, 'success');
     } catch (error) {
       console.error('Export failed:', error);
-      showNotification('Failed to export Excel file', 'error');
+      showNotification(`Failed to export ${exportType.toUpperCase()} file`, 'error');
     } finally {
       setIsExporting(false);
-      handleExportClose();
+      setExportOptionsOpen(false);
+      setExportType(null);
     }
   };
 
@@ -308,34 +373,22 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
             onClose={handleExportClose}
           >
             <MuiMenuItem 
-              onClick={exportToCSV}
+              onClick={() => handleExportOptionClick('csv')}
               disabled={isExporting}
             >
               <ListItemIcon>
-                {isExporting ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <CsvIcon fontSize="small" />
-                )}
+                <CsvIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText>
-                {isExporting ? 'Exporting...' : 'Export to CSV'}
-              </ListItemText>
+              <ListItemText>Export to CSV</ListItemText>
             </MuiMenuItem>
             <MuiMenuItem 
-              onClick={exportToExcel}
+              onClick={() => handleExportOptionClick('excel')}
               disabled={isExporting}
             >
               <ListItemIcon>
-                {isExporting ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <ExcelIcon fontSize="small" />
-                )}
+                <ExcelIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText>
-                {isExporting ? 'Exporting...' : 'Export to Excel'}
-              </ListItemText>
+              <ListItemText>Export to Excel</ListItemText>
             </MuiMenuItem>
           </Menu>
         </Box>
@@ -487,6 +540,79 @@ const TimeHistory: React.FC<TimeHistoryProps> = ({
         onRowsPerPageChange={handleChangeRowsPerPage}
         rowsPerPageOptions={[5, 10, 25, 50]}
       />
+
+      {/* Add Export Options Dialog */}
+      <Dialog 
+        open={exportOptionsOpen} 
+        onClose={() => setExportOptionsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Export Options - {exportType?.toUpperCase() || 'Select Type'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="subtitle1" gutterBottom>
+            Select Columns
+          </Typography>
+          <FormGroup>
+            {exportOptions.columns.map(col => (
+              <FormControlLabel
+                key={col.key}
+                control={
+                  <Checkbox
+                    checked={col.selected}
+                    onChange={() => handleColumnToggle(col.key)}
+                  />
+                }
+                label={col.label}
+              />
+            ))}
+          </FormGroup>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" gutterBottom>
+            Date Range
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Start Date"
+                  value={exportOptions.dateRange.startDate}
+                  onChange={(date) => handleExportDateChange('startDate', date)}
+                  slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+                />
+              </LocalizationProvider>
+            </Grid>
+            <Grid item xs={6}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="End Date"
+                  value={exportOptions.dateRange.endDate}
+                  onChange={(date) => handleExportDateChange('endDate', date)}
+                  slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+                />
+              </LocalizationProvider>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setExportOptionsOpen(false)}
+            color="inherit"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleExport}
+            variant="contained"
+            disabled={isExporting}
+            startIcon={isExporting ? <CircularProgress size={20} /> : undefined}
+          >
+            {isExporting ? 'Exporting...' : 'Export'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };
