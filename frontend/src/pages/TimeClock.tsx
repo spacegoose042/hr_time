@@ -15,6 +15,7 @@ import {
   IconButton,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import TimeHistory from '../components/TimeHistory';
 
 interface TimeEntry {
   id: string;
@@ -34,6 +35,12 @@ interface ApiError {
   }>;
 }
 
+interface TimeHistoryData {
+  entries: TimeEntry[];
+  todayTotal: string;
+  weekTotal: string;
+}
+
 const TimeClock: React.FC = () => {
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<TimeEntry | null>(null);
@@ -42,6 +49,11 @@ const TimeClock: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
+  const [timeHistory, setTimeHistory] = useState<TimeHistoryData>({
+    entries: [],
+    todayTotal: '0:00',
+    weekTotal: '0:00'
+  });
 
   useEffect(() => {
     const checkCurrentStatus = async () => {
@@ -80,6 +92,70 @@ const TimeClock: React.FC = () => {
     checkCurrentStatus();
   }, []);
 
+  const fetchTimeHistory = async () => {
+    try {
+      const response = await fetch('http://localhost:3002/api/time/entries', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch time history');
+
+      const data = await response.json();
+      
+      // Calculate totals
+      const today = new Date().toDateString();
+      const todayEntries = data.filter((entry: TimeEntry) => 
+        new Date(entry.clock_in).toDateString() === today
+      );
+
+      const todayTotal = todayEntries.reduce((total: number, entry: TimeEntry) => {
+        if (entry.clock_out) {
+          const duration = new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime();
+          return total + duration;
+        }
+        return total;
+      }, 0);
+
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      const weekEntries = data.filter((entry: TimeEntry) => 
+        new Date(entry.clock_in) >= weekStart
+      );
+
+      const weekTotal = weekEntries.reduce((total: number, entry: TimeEntry) => {
+        if (entry.clock_out) {
+          const duration = new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime();
+          return total + duration;
+        }
+        return total;
+      }, 0);
+
+      setTimeHistory({
+        entries: data.slice(0, 10), // Show last 10 entries
+        todayTotal: formatDuration(todayTotal),
+        weekTotal: formatDuration(weekTotal)
+      });
+    } catch (error) {
+      console.error('Failed to fetch time history:', error);
+      setError({
+        status: 'error',
+        message: 'Failed to load time history'
+      });
+    }
+  };
+
+  const formatDuration = (ms: number) => {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    fetchTimeHistory();
+  }, []);
+
   const handleClockIn = async () => {
     setError(null);
     setIsLoading(true);
@@ -105,6 +181,7 @@ const TimeClock: React.FC = () => {
 
       setCurrentEntry(data);
       setIsClockedIn(true);
+      await fetchTimeHistory();
     } catch (error) {
       console.error('Clock in failed:', error);
       try {
@@ -147,6 +224,7 @@ const TimeClock: React.FC = () => {
       setCurrentEntry(null);
       setIsClockedIn(false);
       setNotes('');
+      await fetchTimeHistory();
     } catch (error) {
       console.error('Clock out failed:', error);
       try {
@@ -303,6 +381,14 @@ const TimeClock: React.FC = () => {
             Started: {currentEntry ? new Date(currentEntry.clock_in).toLocaleString() : '--'}
           </Typography>
         </Paper>
+      </Grid>
+
+      <Grid item xs={12}>
+        <TimeHistory 
+          entries={timeHistory.entries}
+          todayTotal={timeHistory.todayTotal}
+          weekTotal={timeHistory.weekTotal}
+        />
       </Grid>
     </Grid>
   );
