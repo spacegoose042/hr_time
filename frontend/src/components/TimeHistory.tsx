@@ -3,12 +3,13 @@ import {
   DataGrid, 
   GridColDef,
   GridRenderCellParams,
-  GridValueGetterParams
+  GridRowParams,
+  GridPaginationModel
 } from '@mui/x-data-grid';
 import { Box, Paper, Typography } from '@mui/material';
 import { format } from 'date-fns';
 
-interface TimeEntry {
+export interface TimeEntry {
   id: string;
   clock_in: string;
   clock_out: string | null;
@@ -37,7 +38,7 @@ const columns: GridColDef[] = [
     field: 'duration',
     headerName: 'Duration',
     width: 150,
-    valueGetter: (params: GridValueGetterParams) => {
+    valueGetter: (params: GridRenderCellParams) => {
       if (!params.row.clock_out) return 'In progress';
       const start = new Date(params.row.clock_in);
       const end = new Date(params.row.clock_out);
@@ -85,23 +86,16 @@ interface TimeHistoryProps {
   todayTotal: string;
   weekTotal: string;
   totalCount: number;
-  page: number;
-  rowsPerPage: number;
+  paginationModel: GridPaginationModel;
   isLoading: boolean;
-  onPageChange: (newPage: number) => void;
-  onRowsPerPageChange: (newRowsPerPage: number) => void;
-  filters: Record<string, any>;
-  onFilterChange: (newFilters: Partial<any>) => void;
-  onClearFilters: () => void;
+  onPaginationModelChange: (model: GridPaginationModel) => void;
 }
 
 export default function TimeHistory({
   entries,
   isLoading,
-  page,
-  rowsPerPage,
-  onPageChange,
-  onRowsPerPageChange
+  paginationModel,
+  onPaginationModelChange
 }: TimeHistoryProps) {
   return (
     <Box sx={{ height: 600, width: '100%' }}>
@@ -114,13 +108,11 @@ export default function TimeHistory({
           columns={columns}
           loading={isLoading}
           pageSizeOptions={[5, 10, 25, 50]}
-          page={page}
-          pageSize={rowsPerPage}
-          onPageChange={onPageChange}
-          onPageSizeChange={onRowsPerPageChange}
+          paginationModel={paginationModel}
+          onPaginationModelChange={onPaginationModelChange}
           autoHeight
           disableRowSelectionOnClick
-          getRowClassName={(params) => {
+          getRowClassName={(params: GridRowParams<TimeEntry>) => {
             if (!params.row.clock_out) return 'in-progress';
             return '';
           }}

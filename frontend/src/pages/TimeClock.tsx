@@ -16,14 +16,8 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import TimeHistory from '../components/TimeHistory';
-
-interface TimeEntry {
-  id: string;
-  clock_in: string;
-  clock_out: string | null;
-  notes: string;
-  status: 'pending' | 'approved' | 'rejected';
-}
+import { GridPaginationModel } from '@mui/x-data-grid';
+import { TimeEntry } from '../components/TimeHistory';
 
 interface ApiError {
   status: string;
@@ -56,8 +50,10 @@ const TimeClock: React.FC = () => {
     weekTotal: '0:00',
     totalCount: 0
   });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 10
+  });
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [filters, setFilters] = useState({
     startDate: null as Date | null,
@@ -106,8 +102,8 @@ const TimeClock: React.FC = () => {
     setIsHistoryLoading(true);
     try {
       const queryParams = new URLSearchParams({
-        page: (page + 1).toString(),
-        limit: rowsPerPage.toString()
+        page: (paginationModel.page + 1).toString(),
+        limit: paginationModel.pageSize.toString()
       });
 
       if (filters.startDate) {
@@ -186,7 +182,7 @@ const TimeClock: React.FC = () => {
 
   useEffect(() => {
     fetchTimeHistory();
-  }, [page, rowsPerPage, filters]);
+  }, [paginationModel, filters]);
 
   const handleClockIn = async () => {
     setError(null);
@@ -319,18 +315,8 @@ const TimeClock: React.FC = () => {
     return error.message;
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleRowsPerPageChange = (newRowsPerPage: number) => {
-    setRowsPerPage(newRowsPerPage);
-    setPage(0);
-  };
-
   const handleFilterChange = (newFilters: Partial<typeof filters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
-    setPage(0); // Reset to first page when filters change
   };
 
   const handleClearFilters = () => {
@@ -339,7 +325,6 @@ const TimeClock: React.FC = () => {
       endDate: null,
       status: ''
     });
-    setPage(0);
   };
 
   if (isInitializing) {
@@ -444,14 +429,9 @@ const TimeClock: React.FC = () => {
           todayTotal={timeHistory.todayTotal}
           weekTotal={timeHistory.weekTotal}
           totalCount={timeHistory.totalCount}
-          page={page}
-          rowsPerPage={rowsPerPage}
+          paginationModel={paginationModel}
           isLoading={isHistoryLoading}
-          onPageChange={handlePageChange}
-          onRowsPerPageChange={handleRowsPerPageChange}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onClearFilters={handleClearFilters}
+          onPaginationModelChange={setPaginationModel}
         />
       </Grid>
     </Grid>
