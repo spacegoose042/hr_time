@@ -13,11 +13,16 @@ import {
   Alert,
   Snackbar,
   IconButton,
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import TimeHistory from '../components/TimeHistory';
 import { GridPaginationModel } from '@mui/x-data-grid';
 import { TimeEntry } from '../components/TimeHistory';
+import { TimeHistoryFilters } from '../components/TimeHistory';
 
 interface ApiError {
   status: string;
@@ -34,6 +39,26 @@ interface TimeHistoryData {
   todayTotal: string;
   weekTotal: string;
   totalCount: number;
+}
+
+interface TimeClockState {
+  isClockedIn: boolean;
+  currentEntry: TimeEntry | null;
+  notes: string;
+  duration: string;
+  isLoading: boolean;
+  isInitializing: boolean;
+  error: ApiError | null;
+  timeHistory: TimeHistoryData;
+  paginationModel: GridPaginationModel;
+  isHistoryLoading: boolean;
+  filters: TimeHistoryFilters;
+  editDialogOpen: boolean;
+  selectedEntry: TimeEntry | null;
+  editNotes: string;
+  approvalDialogOpen: boolean;
+  approvalStatus: 'approve' | 'reject';
+  approvalNotes: string;
 }
 
 const TimeClock: React.FC = () => {
@@ -55,12 +80,23 @@ const TimeClock: React.FC = () => {
     pageSize: 10
   });
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    startDate: null as Date | null,
-    endDate: null as Date | null,
+  const [filters, setFilters] = useState<TimeHistoryFilters>({
+    startDate: null,
+    endDate: null,
     status: '',
-    searchTerm: ''
+    searchTerm: '',
+    minDuration: null,
+    maxDuration: null,
+    hasBreak: null,
+    project: '',
+    task: ''
   });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null);
+  const [editNotes, setEditNotes] = useState('');
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<'approve' | 'reject'>('approve');
+  const [approvalNotes, setApprovalNotes] = useState('');
 
   useEffect(() => {
     const checkCurrentStatus = async () => {
@@ -107,18 +143,15 @@ const TimeClock: React.FC = () => {
         limit: paginationModel.pageSize.toString()
       });
 
-      if (filters.startDate) {
-        queryParams.append('startDate', filters.startDate.toISOString());
-      }
-      if (filters.endDate) {
-        queryParams.append('endDate', filters.endDate.toISOString());
-      }
-      if (filters.status) {
-        queryParams.append('status', filters.status);
-      }
-      if (filters.searchTerm) {
-        queryParams.append('search', filters.searchTerm);
-      }
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== null && value !== '') {
+          if (value instanceof Date) {
+            queryParams.append(key, value.toISOString());
+          } else {
+            queryParams.append(key, value.toString());
+          }
+        }
+      });
 
       const response = await fetch(
         `http://localhost:3002/api/time/entries?${queryParams}`,
@@ -329,9 +362,86 @@ const TimeClock: React.FC = () => {
       startDate: null,
       endDate: null,
       status: '',
-      searchTerm: ''
+      searchTerm: '',
+      minDuration: null,
+      maxDuration: null,
+      hasBreak: null,
+      project: '',
+      task: ''
     });
     setPaginationModel(prev => ({ ...prev, page: 0 }));
+  };
+
+  const handleEditEntry = async (entry: TimeEntry) => {
+    setSelectedEntry(entry);
+    setEditNotes(entry.notes || '');
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedEntry) return;
+
+    try {
+      const response = await fetch(`/api/time/current`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          notes: editNotes
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to update entry');
+
+      setEditDialogOpen(false);
+      await fetchTimeHistory();
+    } catch (error) {
+      console.error('Failed to update entry:', error);
+      // Handle error
+    }
+  };
+
+  const handleApproveEntry = async (entry: TimeEntry) => {
+    setSelectedEntry(entry);
+    setApprovalStatus('approve');
+    setApprovalNotes('');
+    setApprovalDialogOpen(true);
+  };
+
+  const handleRejectEntry = async (entry: TimeEntry) => {
+    setSelectedEntry(entry);
+    setApprovalStatus('reject');
+    setApprovalNotes('');
+    setApprovalDialogOpen(true);
+  };
+
+  const handleApprovalSubmit = async () => {
+    if (!selectedEntry) return;
+
+    try {
+      const response = await fetch(`/api/time/approve`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          timeEntryIds: [selectedEntry.id],
+          status: approvalStatus,
+          notes: approvalNotes
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to update status');
+
+      setApprovalDialogOpen(false);
+      await fetchTimeHistory();
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      // Handle error
+    }
   };
 
   if (isInitializing) {
@@ -442,8 +552,60 @@ const TimeClock: React.FC = () => {
           filters={filters}
           onFilterChange={handleFilterChange}
           onClearFilters={handleClearFilters}
+          onEditEntry={handleEditEntry}
+          onApproveEntry={handleApproveEntry}
+          onRejectEntry={handleRejectEntry}
+          userRole="manager" // Or get from auth context
         />
       </Grid>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
+        <DialogTitle>Edit Time Entry</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Notes"
+            value={editNotes}
+            onChange={(e) => setEditNotes(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleSaveEdit} variant="contained">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)}>
+        <DialogTitle>
+          {approvalStatus === 'approve' ? 'Approve' : 'Reject'} Time Entry
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Notes"
+            value={approvalNotes}
+            onChange={(e) => setApprovalNotes(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApprovalDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleApprovalSubmit} 
+            variant="contained"
+            color={approvalStatus === 'approve' ? 'primary' : 'error'}
+          >
+            {approvalStatus === 'approve' ? 'Approve' : 'Reject'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Grid>
   );
 };

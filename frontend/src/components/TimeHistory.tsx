@@ -8,7 +8,7 @@ import {
   GridFilterInputValue,
   GridFilterItem
 } from '@mui/x-data-grid';
-import { Box, Paper, Typography, Chip, Tooltip, IconButton, MenuItem, Menu, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, Paper, Typography, Chip, Tooltip, IconButton, MenuItem, Menu, ListItemIcon, ListItemText, Stack, Button } from '@mui/material';
 import { format, formatDistanceToNow } from 'date-fns';
 import TimeHistoryFilters from './TimeHistoryFilters';
 import { 
@@ -21,8 +21,12 @@ import {
   Edit as EditIcon,
   CheckCircleOutline as ApproveIcon,
   Block as RejectIcon,
-  MoreVert as MoreIcon
+  MoreVert as MoreIcon,
+  Download as DownloadIcon,
+  FilterList as FilterIcon
 } from '@mui/icons-material';
+import TimeHistoryAdvancedFilters from './TimeHistoryAdvancedFilters';
+import { exportToCSV } from '../services/exportService';
 
 export interface TimeEntry {
   id: string;
@@ -364,6 +368,19 @@ const getRowStyle = (params: GridRowParams<TimeEntry>) => {
   return style;
 };
 
+// Update the filters interface
+interface TimeHistoryFilters {
+  startDate: Date | null;
+  endDate: Date | null;
+  status: string;
+  searchTerm: string;
+  minDuration: number | null;
+  maxDuration: number | null;
+  hasBreak: boolean | null;
+  project: string;
+  task: string;
+}
+
 interface TimeHistoryProps {
   entries: TimeEntry[];
   todayTotal: string;
@@ -372,12 +389,7 @@ interface TimeHistoryProps {
   paginationModel: GridPaginationModel;
   isLoading: boolean;
   onPaginationModelChange: (model: GridPaginationModel) => void;
-  filters: {
-    startDate: Date | null;
-    endDate: Date | null;
-    status: string;
-    searchTerm: string;
-  };
+  filters: TimeHistoryFilters;
   onFilterChange: (filters: Partial<TimeHistoryProps['filters']>) => void;
   onClearFilters: () => void;
   onEditEntry?: (entry: TimeEntry) => void;
@@ -414,12 +426,46 @@ export default function TimeHistory({
             <Typography variant="body2">Week's Total: {weekTotal}</Typography>
           </Box>
         </Box>
-        
-        <TimeHistoryFilters
-          filters={filters}
-          onFilterChange={onFilterChange}
-          onClearFilters={onClearFilters}
-        />
+
+        <Stack 
+          direction="row" 
+          spacing={2} 
+          alignItems="center" 
+          sx={{ mb: 2 }}
+        >
+          {/* Advanced Filters */}
+          <TimeHistoryAdvancedFilters
+            filters={filters}
+            onFilterChange={onFilterChange}
+            onClearFilters={onClearFilters}
+          />
+
+          {/* Export Button */}
+          <Button
+            startIcon={<DownloadIcon />}
+            onClick={() => exportToCSV(entries)}
+            variant="outlined"
+            size="small"
+          >
+            Export
+          </Button>
+
+          {/* Active Filters Display */}
+          <Box sx={{ flex: 1 }}>
+            {Object.entries(filters).map(([key, value]) => {
+              if (!value) return null;
+              return (
+                <Chip
+                  key={key}
+                  label={`${key}: ${value}`}
+                  size="small"
+                  onDelete={() => onFilterChange({ [key]: null })}
+                  sx={{ mr: 1, mb: 1 }}
+                />
+              );
+            })}
+          </Box>
+        </Stack>
 
         <DataGrid
           rows={entries}
@@ -446,6 +492,15 @@ export default function TimeHistory({
             '& .MuiDataGrid-row:hover': {
               bgcolor: 'rgba(0, 0, 0, 0.04)',
             }
+          }}
+          components={{
+            Toolbar: () => (
+              <Box sx={{ p: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  {totalCount} entries found
+                </Typography>
+              </Box>
+            )
           }}
         />
       </Paper>
