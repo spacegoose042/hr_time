@@ -174,9 +174,9 @@ type AsyncRequestHandler = (
   next: NextFunction
 ) => Promise<unknown>;
 
-const wrapAsync = (fn: AsyncRequestHandler): RequestHandler => {
+const wrapAsync = (fn: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<unknown>): RequestHandler => {
   return function(req: Request, res: Response, next: NextFunction) {
-    fn(req, res, next).catch(next);
+    fn(req as AuthenticatedRequest, res, next).catch(next);
   };
 };
 

@@ -22,8 +22,7 @@ import {
   CheckCircleOutline as ApproveIcon,
   Block as RejectIcon,
   MoreVert as MoreIcon,
-  Download as DownloadIcon,
-  FilterList as FilterIcon
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import TimeHistoryAdvancedFilters from './TimeHistoryAdvancedFilters';
 import { exportToCSV } from '../services/exportService';
@@ -369,7 +368,7 @@ const getRowStyle = (params: GridRowParams<TimeEntry>) => {
 };
 
 // Update the filters interface
-interface TimeHistoryFilters {
+export interface TimeHistoryFilters {
   startDate: Date | null;
   endDate: Date | null;
   status: string;
@@ -415,6 +414,14 @@ export default function TimeHistory({
   userRole
 }: TimeHistoryProps) {
   const columns = createColumns(onEditEntry, onApproveEntry, onRejectEntry, userRole);
+  
+  const CustomToolbar = () => (
+    <Box sx={{ p: 1 }}>
+      <Typography variant="subtitle2" color="text.secondary">
+        {totalCount} entries found
+      </Typography>
+    </Box>
+  );
   
   return (
     <Box sx={{ height: 600, width: '100%' }}>
@@ -493,14 +500,8 @@ export default function TimeHistory({
               bgcolor: 'rgba(0, 0, 0, 0.04)',
             }
           }}
-          components={{
-            Toolbar: () => (
-              <Box sx={{ p: 1 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  {totalCount} entries found
-                </Typography>
-              </Box>
-            )
+          slots={{
+            toolbar: CustomToolbar
           }}
         />
       </Paper>

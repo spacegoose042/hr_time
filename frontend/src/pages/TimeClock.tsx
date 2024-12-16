@@ -41,26 +41,6 @@ interface TimeHistoryData {
   totalCount: number;
 }
 
-interface TimeClockState {
-  isClockedIn: boolean;
-  currentEntry: TimeEntry | null;
-  notes: string;
-  duration: string;
-  isLoading: boolean;
-  isInitializing: boolean;
-  error: ApiError | null;
-  timeHistory: TimeHistoryData;
-  paginationModel: GridPaginationModel;
-  isHistoryLoading: boolean;
-  filters: TimeHistoryFilters;
-  editDialogOpen: boolean;
-  selectedEntry: TimeEntry | null;
-  editNotes: string;
-  approvalDialogOpen: boolean;
-  approvalStatus: 'approve' | 'reject';
-  approvalNotes: string;
-}
-
 const TimeClock: React.FC = () => {
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<TimeEntry | null>(null);
@@ -144,11 +124,11 @@ const TimeClock: React.FC = () => {
       });
 
       Object.entries(filters).forEach(([key, value]) => {
-        if (value !== null && value !== '') {
+        if (value != null && value !== '') {
           if (value instanceof Date) {
             queryParams.append(key, value.toISOString());
           } else {
-            queryParams.append(key, value.toString());
+            queryParams.append(key, String(value));
           }
         }
       });
@@ -352,9 +332,9 @@ const TimeClock: React.FC = () => {
     return error.message;
   };
 
-  const handleFilterChange = (newFilters: Partial<typeof filters>) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
-    setPaginationModel(prev => ({ ...prev, page: 0 }));
+  const handleFilterChange = (newFilters: Partial<TimeHistoryFilters>) => {
+    setFilters((prev: TimeHistoryFilters) => ({ ...prev, ...newFilters }));
+    setPaginationModel((prev: GridPaginationModel) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {

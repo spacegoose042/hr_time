@@ -34,4 +34,10 @@ const calculateDuration = (entry: TimeEntry): string => {
   const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
   
   return `${hours}h ${minutes}m`;
-}; 
+};
+
+export class ExportService {
+  static async exportAuditLogs(format: 'csv' | 'json', options: ExportOptions = {}) {
+    // ... implementation
+  }
+} 
