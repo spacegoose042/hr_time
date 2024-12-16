@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { DataGrid, GridColDef, GridValueFormatterParams, GridValueGetterParams } from '@mui/x-data-grid';
+import { 
+  DataGrid, 
+  GridColDef,
+  GridValueFormatterFn,
+  GridValueGetterFn
+} from '@mui/x-data-grid';
 import { Box, Paper, Typography } from '@mui/material';
 import { format } from 'date-fns';
 
@@ -19,21 +24,21 @@ const columns: GridColDef[] = [
     field: 'clock_in',
     headerName: 'Clock In',
     width: 200,
-    valueFormatter: (params: GridValueFormatterParams) => 
-      format(new Date(params.value), 'PPpp'),
+    valueFormatter: ((params) => format(new Date(params.value), 'PPpp')) as GridValueFormatterFn
   },
   {
     field: 'clock_out',
     headerName: 'Clock Out',
     width: 200,
-    valueFormatter: (params: GridValueFormatterParams) => 
-      params.value ? format(new Date(params.value), 'PPpp') : 'Not clocked out',
+    valueFormatter: ((params) => 
+      params.value ? format(new Date(params.value), 'PPpp') : 'Not clocked out'
+    ) as GridValueFormatterFn
   },
   {
     field: 'duration',
     headerName: 'Duration',
     width: 150,
-    valueGetter: (params: GridValueGetterParams) => {
+    valueGetter: ((params) => {
       if (!params.row.clock_out) return 'In progress';
       const start = new Date(params.row.clock_in);
       const end = new Date(params.row.clock_out);
@@ -41,7 +46,7 @@ const columns: GridColDef[] = [
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
       return `${hours}h ${minutes}m`;
-    },
+    }) as GridValueGetterFn
   },
   {
     field: 'break_minutes',
@@ -76,7 +81,22 @@ const columns: GridColDef[] = [
   },
 ];
 
-export default function TimeHistory() {
+interface TimeHistoryProps {
+  entries: TimeEntry[];
+  todayTotal: string;
+  weekTotal: string;
+  totalCount: number;
+  page: number;
+  rowsPerPage: number;
+  isLoading: boolean;
+  onPageChange: (newPage: number) => void;
+  onRowsPerPageChange: (newRowsPerPage: number) => void;
+  filters: Record<string, any>;
+  onFilterChange: (newFilters: Partial<any>) => void;
+  onClearFilters: () => void;
+}
+
+export default function TimeHistory(props: TimeHistoryProps) {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
