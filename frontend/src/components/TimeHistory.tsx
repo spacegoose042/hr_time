@@ -475,12 +475,14 @@ export default function TimeHistory({
   const availableProjects = ['Project A', 'Project B', 'Project C'];
   const availableTasks = ['Task 1', 'Task 2', 'Task 3'];
 
-  const handleExport = (format: ExportFormat = 'csv') => {
-    if (format === 'csv') {
-      exportToCSV(entries);
-    } else {
-      exportTimeEntries(entries, { format });
-    }
+  const handleExport = () => {
+    exportToCSV(entries.map(entry => ({
+      ...entry,
+      clock_out: entry.clock_out || '',
+      notes: entry.notes || '',
+      project: entry.project || '',
+      task: entry.task || ''
+    })));
   };
 
   return (
@@ -512,7 +514,7 @@ export default function TimeHistory({
           {/* Export Button */}
           <Button
             startIcon={<DownloadIcon />}
-            onClick={() => handleExport('csv')}
+            onClick={handleExport}
             variant="outlined"
             size="small"
           >

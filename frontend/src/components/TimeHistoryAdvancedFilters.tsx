@@ -58,7 +58,7 @@ type AutocompleteChangeHandler = (
 ) => void;
 
 type SliderChangeHandler = (
-  event: Event,
+  event: Event | null,
   value: number | number[]
 ) => void;
 
@@ -103,20 +103,20 @@ export default function TimeHistoryAdvancedFilters({
     return count;
   };
 
-  const handleProjectsChange: FilterChangeHandler<string[]> = (value) => {
-    onFilterChange({ projects: value });
+  const handleProjectsChange: AutocompleteChangeHandler = (_, newValue) => {
+    onFilterChange({ projects: newValue });
   };
 
-  const handleTasksChange: FilterChangeHandler<string[]> = (value) => {
-    onFilterChange({ tasks: value });
+  const handleTasksChange: AutocompleteChangeHandler = (_, newValue) => {
+    onFilterChange({ tasks: newValue });
   };
 
-  const handleDurationChange: FilterChangeHandler<[number, number]> = (value) => {
-    onFilterChange({ durationRange: value });
+  const handleDurationChange: SliderChangeHandler = (_, newValue) => {
+    onFilterChange({ durationRange: newValue as [number, number] });
   };
 
-  const handleNotesChange: FilterChangeHandler<boolean> = (value) => {
-    onFilterChange({ hasNotes: value });
+  const handleNotesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onFilterChange({ hasNotes: event.target.checked });
   };
 
   return (
