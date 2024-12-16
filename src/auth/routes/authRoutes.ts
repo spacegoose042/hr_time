@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { RequestHandler } from 'express-serve-static-core';
 import { AuthController } from '../controllers/authController';
 import { AuthService } from '../services/authService';
 import { validateRequest } from '../../middleware/validateRequest';
@@ -69,7 +70,7 @@ router.post(
   '/forgot-password',
   resetLimiter,
   validateRequest(forgotPasswordSchema),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email } = req.body;
       const employeeRepo = AppDataSource.getRepository(Employee);
@@ -108,8 +109,9 @@ router.post(
       });
     } catch (error) {
       next(error);
+      return;
     }
-  }
+  }) as RequestHandler
 );
 
 // Verify reset token

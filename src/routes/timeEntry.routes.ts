@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { RequestHandler } from 'express-serve-static-core';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { validateRequest } from '../middleware/validateRequest';
 import { z } from 'zod';
@@ -170,7 +171,7 @@ const validateTimeEntry = async (
 router.post('/clock-in',
   requireAuth,
   validateRequest(clockInSchema),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       console.log('Clock in request from user:', req.user);
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
@@ -205,11 +206,13 @@ router.post('/clock-in',
         status: 'success',
         data: savedEntry
       });
+      return;
     } catch (error) {
       console.error('Error in clock-in endpoint:', error);
       next(error);
+      return;
     }
-  }
+  }) as RequestHandler
 );
 
 // Clock out
@@ -337,7 +340,7 @@ router.get('/entries',
 router.get('/pending-approval',
   requireAuth,
   requireRole(UserRole.MANAGER),
-  async (req, res, next) => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employeeRepo = AppDataSource.getRepository(Employee);
@@ -369,10 +372,12 @@ router.get('/pending-approval',
       });
 
       res.json(entries);
+      return;
     } catch (error) {
       next(error);
+      return;
     }
-  }
+  }) as RequestHandler
 );
 
 // Approve/Reject time entries
@@ -514,7 +519,7 @@ router.post('/test-weekly-report',
 // Add this near your other routes
 router.get('/current',
   requireAuth,
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
@@ -529,7 +534,7 @@ router.get('/current',
       });
 
       if (!openEntry) {
-        return res.json({ 
+        res.json({ 
           status: 'not_clocked_in',
           message: 'No open time entry found',
           lastEntry: await timeEntryRepo.findOne({
@@ -538,6 +543,7 @@ router.get('/current',
             relations: ['employee']
           })
         });
+        return;
       }
 
       // Calculate duration so far
@@ -545,7 +551,7 @@ router.get('/current',
       const durationMs = now.getTime() - new Date(openEntry.clock_in).getTime();
       const durationHours = durationMs / (1000 * 60 * 60);
 
-      return res.json({
+      res.json({
         status: 'clocked_in',
         timeEntry: openEntry,
         duration: {
@@ -554,16 +560,18 @@ router.get('/current',
           seconds: Math.floor((durationMs / 1000) % 60)
         }
       });
+      return;
     } catch (error) {
-      return next(error);
+      next(error);
+      return;
     }
-  }
+  }) as RequestHandler
 );
 
 router.patch('/current',
   requireAuth,
   validateRequest(updateCurrentSchema),
-  async (req, res, next) => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
@@ -637,8 +645,8 @@ router.patch('/current',
       const durationHours = netDurationMs / (1000 * 60 * 60);
 
       return res.json({
-        status: 'updated',
-        timeEntry: updatedEntry,
+        status: 'success',
+        data: updatedEntry,
         duration: {
           hours: Number(durationHours.toFixed(2)),
           minutes: Math.floor((netDurationMs / (1000 * 60)) % 60),
@@ -646,10 +654,12 @@ router.patch('/current',
           breakMinutes: updatedEntry.break_minutes || 0
         }
       });
+      return;
     } catch (error) {
-      return next(error);
+      next(error);
+      return;
     }
-  }
+  }) as RequestHandler
 );
 
 router.post('/force-close',
@@ -774,7 +784,7 @@ router.post('/force-close',
 router.get('/audit-logs',
   requireAuth,
   requireRole(UserRole.MANAGER),
-  async (req, res, next) => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const auditRepo = AppDataSource.getRepository(AuditLog);
       const { timeEntryId } = req.query;
@@ -801,7 +811,7 @@ router.get('/audit-logs',
       console.error('Error fetching audit logs:', error);
       return next(error);
     }
-  }
+  }) as RequestHandler
 );
 
 export default router; 
