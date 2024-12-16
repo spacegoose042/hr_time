@@ -17,4 +17,4 @@ declare module 'csv-writer' {
   }
 
   export function createObjectCsvStringifier(options: CsvStringifierOptions): ObjectCsvStringifier;
-}
+} 
