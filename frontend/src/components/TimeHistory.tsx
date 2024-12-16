@@ -8,6 +8,7 @@ import {
 } from '@mui/x-data-grid';
 import { Box, Paper, Typography } from '@mui/material';
 import { format } from 'date-fns';
+import TimeHistoryFilters from './TimeHistoryFilters';
 
 export interface TimeEntry {
   id: string;
@@ -89,13 +90,24 @@ interface TimeHistoryProps {
   paginationModel: GridPaginationModel;
   isLoading: boolean;
   onPaginationModelChange: (model: GridPaginationModel) => void;
+  filters: {
+    startDate: Date | null;
+    endDate: Date | null;
+    status: string;
+    searchTerm: string;
+  };
+  onFilterChange: (filters: Partial<TimeHistoryProps['filters']>) => void;
+  onClearFilters: () => void;
 }
 
 export default function TimeHistory({
   entries,
   isLoading,
   paginationModel,
-  onPaginationModelChange
+  onPaginationModelChange,
+  filters,
+  onFilterChange,
+  onClearFilters
 }: TimeHistoryProps) {
   return (
     <Box sx={{ height: 600, width: '100%' }}>
@@ -103,6 +115,11 @@ export default function TimeHistory({
         <Typography variant="h5" gutterBottom>
           Time Entry History
         </Typography>
+        <TimeHistoryFilters
+          filters={filters}
+          onFilterChange={onFilterChange}
+          onClearFilters={onClearFilters}
+        />
         <DataGrid
           rows={entries}
           columns={columns}

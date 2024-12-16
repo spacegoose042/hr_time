@@ -58,7 +58,8 @@ const TimeClock: React.FC = () => {
   const [filters, setFilters] = useState({
     startDate: null as Date | null,
     endDate: null as Date | null,
-    status: ''
+    status: '',
+    searchTerm: ''
   });
 
   useEffect(() => {
@@ -114,6 +115,9 @@ const TimeClock: React.FC = () => {
       }
       if (filters.status) {
         queryParams.append('status', filters.status);
+      }
+      if (filters.searchTerm) {
+        queryParams.append('search', filters.searchTerm);
       }
 
       const response = await fetch(
@@ -317,14 +321,17 @@ const TimeClock: React.FC = () => {
 
   const handleFilterChange = (newFilters: Partial<typeof filters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
     setFilters({
       startDate: null,
       endDate: null,
-      status: ''
+      status: '',
+      searchTerm: ''
     });
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   if (isInitializing) {
@@ -432,6 +439,9 @@ const TimeClock: React.FC = () => {
           paginationModel={paginationModel}
           isLoading={isHistoryLoading}
           onPaginationModelChange={setPaginationModel}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
         />
       </Grid>
     </Grid>
