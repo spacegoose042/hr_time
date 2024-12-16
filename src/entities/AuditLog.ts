@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from 'typeorm';
 import { Employee } from './Employee';
+import { TimeEntry } from './TimeEntry';
 
 export enum AuditAction {
   PASSWORD_RESET = 'PASSWORD_RESET',
@@ -13,30 +14,34 @@ export enum AuditAction {
 
 @Entity('audit_logs')
 export class AuditLog {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column()
+  @Column({ name: 'employee_id' })
   employeeId: string;
 
-  @ManyToOne(() => Employee)
+  @ManyToOne(() => Employee, { eager: true })
   employee: Employee;
 
   @Column({
     type: 'enum',
-    enum: AuditAction
+    enum: AuditAction,
+    name: 'action'
   })
   action: AuditAction;
 
-  @Column('jsonb', { nullable: true })
-  metadata: Record<string, any>;
+  @Column('jsonb', { name: 'metadata', nullable: true })
+  metadata: any;
 
-  @Column({ nullable: true })
+  @Column({ name: 'ip_address', nullable: true })
   ip_address: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'user_agent', nullable: true })
   user_agent: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
+
+  @ManyToOne(() => TimeEntry, timeEntry => timeEntry.auditLogs, { nullable: true })
+  timeEntry: TimeEntry;
 } 

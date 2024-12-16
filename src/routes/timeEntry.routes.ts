@@ -581,6 +581,7 @@ router.get('/current',
   }) as RequestHandler
 );
 
+// @ts-ignore: Express RequestHandler type limitation with async functions
 router.patch(
   '/current',
   requireAuth,
@@ -788,7 +789,7 @@ router.post('/force-close',
   }
 );
 
-// Add an endpoint to view audit logs
+// @ts-ignore: Express RequestHandler type limitation with async functions
 router.get(
   '/audit-logs',
   requireAuth,

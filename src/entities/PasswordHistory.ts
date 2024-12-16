@@ -3,18 +3,18 @@ import { Employee } from './Employee';
 
 @Entity('password_history')
 export class PasswordHistory {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column()
+  @Column({ name: 'password_hash' })
   password_hash: string;
 
-  @Column()
+  @Column({ name: 'employee_id' })
   employeeId: string;
 
-  @ManyToOne(() => Employee, employee => employee.passwordHistory)
+  @ManyToOne(() => Employee, employee => employee.passwordHistory, { eager: true })
   employee: Employee;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 } 

@@ -1,49 +1,56 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn, OneToMany } from 'typeorm';
 import { Employee } from './Employee';
+import { AuditLog } from './AuditLog';
 
 @Entity('time_entries')
 export class TimeEntry {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn()
   id: string;
 
-  @Column({ name: 'employee_id' })
+  @Column()
   employeeId: string;
-
-  @ManyToOne(() => Employee, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'employee_id' })
-  employee: Employee;
 
   @Column({ type: 'timestamp' })
   clock_in: Date;
 
   @Column({ type: 'timestamp', nullable: true })
-  clock_out: Date;
+  clock_out: Date | null;
+
+  @ManyToOne(() => Employee)
+  @JoinColumn({ name: 'employee_id' })
+  employee: Employee;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  break_minutes: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  break_notes: string | null;
 
   @Column({
     type: 'enum',
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   })
-  status: 'pending' | 'approved' | 'rejected';
+  status: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 
-  @Column({ type: 'varchar', nullable: true })
-  project: string;
+  @Column({ type: 'text', nullable: true })
+  project: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
-  task: string;
+  @Column({ type: 'text', nullable: true })
+  task: string | null;
 
-  @Column({ type: 'int', nullable: true, name: 'break_minutes' })
-  break_minutes: number;
+  @OneToMany(() => AuditLog, audit => audit.timeEntry, { cascade: true })
+  auditLogs: AuditLog[];
 
-  @Column({ type: 'text', nullable: true, name: 'break_notes' })
-  break_notes: string;
+  @ManyToOne(() => Employee, { nullable: true })
+  approver: Employee | null;
 } 
