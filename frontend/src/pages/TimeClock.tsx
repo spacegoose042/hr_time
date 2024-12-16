@@ -69,7 +69,12 @@ const TimeClock: React.FC = () => {
     maxDuration: null,
     hasBreak: null,
     project: '',
-    task: ''
+    task: '',
+    durationRange: [0, 12],
+    hasNotes: null,
+    projects: [],
+    tasks: [],
+    dateRange: 'today'
   });
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null);
@@ -347,7 +352,12 @@ const TimeClock: React.FC = () => {
       maxDuration: null,
       hasBreak: null,
       project: '',
-      task: ''
+      task: '',
+      durationRange: [0, 12],
+      hasNotes: null,
+      projects: [],
+      tasks: [],
+      dateRange: 'today'
     });
     setPaginationModel(prev => ({ ...prev, page: 0 }));
   };

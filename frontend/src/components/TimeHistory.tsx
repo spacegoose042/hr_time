@@ -6,9 +6,11 @@ import {
   GridRowParams,
   GridPaginationModel,
   GridFilterInputValue,
-  GridFilterItem
+  GridFilterItem,
+  GridRowSelectionModel,
+  GridCallbackDetails
 } from '@mui/x-data-grid';
-import { Box, Paper, Typography, Chip, Tooltip, IconButton, MenuItem, Menu, ListItemIcon, ListItemText, Stack, Button } from '@mui/material';
+import { Box, Paper, Typography, Chip, Tooltip, IconButton, MenuItem, Menu, ListItemIcon, ListItemText, Stack, Button, SpeedDial, SpeedDialIcon, SpeedDialAction } from '@mui/material';
 import { format, formatDistanceToNow } from 'date-fns';
 import TimeHistoryFilters from './TimeHistoryFilters';
 import { 
@@ -22,10 +24,16 @@ import {
   CheckCircleOutline as ApproveIcon,
   Block as RejectIcon,
   MoreVert as MoreIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  DeleteOutline as DeleteIcon,
+  GetApp as ExportIcon,
+  AssignmentTurnedIn as SubmitIcon,
+  LocalPrintshop as PrintIcon,
+  Email as EmailIcon,
+  Archive as ArchiveIcon
 } from '@mui/icons-material';
 import TimeHistoryAdvancedFilters from './TimeHistoryAdvancedFilters';
-import { exportToCSV } from '../services/exportService';
+import { exportToCSV, exportTimeEntries } from '../services/exportService';
 
 export interface TimeEntry {
   id: string;
@@ -378,6 +386,11 @@ export interface TimeHistoryFilters {
   hasBreak: boolean | null;
   project: string;
   task: string;
+  durationRange: [number, number];
+  hasNotes: boolean | null;
+  projects: string[];
+  tasks: string[];
+  dateRange: 'today' | 'week' | 'month' | 'custom';
 }
 
 interface TimeHistoryProps {
@@ -395,6 +408,13 @@ interface TimeHistoryProps {
   onApproveEntry?: (entry: TimeEntry) => void;
   onRejectEntry?: (entry: TimeEntry) => void;
   userRole?: 'employee' | 'manager' | 'admin';
+  onBulkApprove?: (entries: TimeEntry[]) => void;
+  onBulkReject?: (entries: TimeEntry[]) => void;
+  onBulkDelete?: (entries: TimeEntry[]) => void;
+  onBulkSubmit?: (entries: TimeEntry[]) => void;
+  onBulkPrint?: (entries: TimeEntry[]) => void;
+  onBulkEmail?: (entries: TimeEntry[]) => void;
+  onBulkArchive?: (entries: TimeEntry[]) => void;
 }
 
 export default function TimeHistory({
@@ -411,10 +431,39 @@ export default function TimeHistory({
   onEditEntry,
   onApproveEntry,
   onRejectEntry,
-  userRole
+  userRole,
+  onBulkApprove,
+  onBulkReject,
+  onBulkDelete,
+  onBulkSubmit,
+  onBulkPrint,
+  onBulkEmail,
+  onBulkArchive
 }: TimeHistoryProps) {
   const columns = createColumns(onEditEntry, onApproveEntry, onRejectEntry, userRole);
-  
+  const [selectedEntries, setSelectedEntries] = useState<TimeEntry[]>([]);
+
+  const handleSelectionChange = (
+    newSelection: GridRowSelectionModel,
+    _details: GridCallbackDetails
+  ) => {
+    const selected = entries.filter(entry => 
+      (newSelection as string[]).includes(entry.id)
+    );
+    setSelectedEntries(selected);
+  };
+
+  const bulkActions = [
+    { icon: <ApproveIcon />, name: 'Approve', action: () => onBulkApprove?.(selectedEntries) },
+    { icon: <RejectIcon />, name: 'Reject', action: () => onBulkReject?.(selectedEntries) },
+    { icon: <DeleteIcon />, name: 'Delete', action: () => onBulkDelete?.(selectedEntries) },
+    { icon: <ExportIcon />, name: 'Export', action: () => exportTimeEntries(selectedEntries, { format: 'xlsx' }) },
+    { icon: <SubmitIcon />, name: 'Submit', action: () => onBulkSubmit?.(selectedEntries) },
+    { icon: <PrintIcon />, name: 'Print', action: () => onBulkPrint?.(selectedEntries) },
+    { icon: <EmailIcon />, name: 'Email', action: () => onBulkEmail?.(selectedEntries) },
+    { icon: <ArchiveIcon />, name: 'Archive', action: () => onBulkArchive?.(selectedEntries) }
+  ];
+
   const CustomToolbar = () => (
     <Box sx={{ p: 1 }}>
       <Typography variant="subtitle2" color="text.secondary">
@@ -423,6 +472,9 @@ export default function TimeHistory({
     </Box>
   );
   
+  const availableProjects = ['Project A', 'Project B', 'Project C'];
+  const availableTasks = ['Task 1', 'Task 2', 'Task 3'];
+
   return (
     <Box sx={{ height: 600, width: '100%' }}>
       <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
@@ -445,6 +497,8 @@ export default function TimeHistory({
             filters={filters}
             onFilterChange={onFilterChange}
             onClearFilters={onClearFilters}
+            availableProjects={availableProjects}
+            availableTasks={availableTasks}
           />
 
           {/* Export Button */}
@@ -503,7 +557,25 @@ export default function TimeHistory({
           slots={{
             toolbar: CustomToolbar
           }}
+          checkboxSelection
+          onRowSelectionModelChange={handleSelectionChange}
         />
+        {selectedEntries.length > 0 && (
+          <SpeedDial
+            ariaLabel="Bulk Actions"
+            sx={{ position: 'fixed', bottom: 16, right: 16 }}
+            icon={<SpeedDialIcon />}
+          >
+            {bulkActions.map((action) => (
+              <SpeedDialAction
+                key={action.name}
+                icon={action.icon}
+                tooltipTitle={action.name}
+                onClick={action.action}
+              />
+            ))}
+          </SpeedDial>
+        )}
       </Paper>
     </Box>
   );

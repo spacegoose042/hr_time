@@ -3,13 +3,13 @@ import { Employee } from './Employee';
 import { TimeEntry } from './TimeEntry';
 
 export enum AuditAction {
-  PASSWORD_RESET = 'PASSWORD_RESET',
-  PASSWORD_CHANGE = 'PASSWORD_CHANGE',
-  FAILED_PASSWORD_ATTEMPT = 'FAILED_PASSWORD_ATTEMPT',
-  ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
-  ACCOUNT_UNLOCKED = 'ACCOUNT_UNLOCKED',
-  OVERRIDE_VALIDATION = 'OVERRIDE_VALIDATION',
-  FORCE_CLOSE = 'FORCE_CLOSE'
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  APPROVE = 'approve',
+  REJECT = 'reject',
+  FORCE_CLOSE = 'force_close',
+  OVERRIDE_VALIDATION = 'override_validation'
 }
 
 @Entity('audit_logs')

@@ -9,7 +9,12 @@ import {
   Select, 
   MenuItem,
   Chip,
-  IconButton
+  IconButton,
+  Typography,
+  Slider,
+  FormControlLabel,
+  Switch,
+  Autocomplete
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 import { FilterList as FilterIcon, Close as ClearIcon } from '@mui/icons-material';
@@ -25,18 +30,46 @@ interface AdvancedFilters {
   hasBreak: boolean | null;
   project: string;
   task: string;
+  durationRange: [number, number];
+  hasNotes: boolean | null;
+  projects: string[];
+  tasks: string[];
+  dateRange: 'today' | 'week' | 'month' | 'custom';
 }
 
 interface TimeHistoryAdvancedFiltersProps {
   filters: AdvancedFilters;
   onFilterChange: (filters: Partial<AdvancedFilters>) => void;
   onClearFilters: () => void;
+  availableProjects: string[];
+  availableTasks: string[];
 }
+
+const DATE_RANGE_OPTIONS = [
+  { label: 'Today', value: 'today' },
+  { label: 'This Week', value: 'week' },
+  { label: 'This Month', value: 'month' },
+  { label: 'Custom Range', value: 'custom' }
+] as const;
+
+type AutocompleteChangeHandler = (
+  event: React.SyntheticEvent,
+  value: string[]
+) => void;
+
+type SliderChangeHandler = (
+  event: Event,
+  value: number | number[]
+) => void;
+
+type SwitchChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
 
 export default function TimeHistoryAdvancedFilters({
   filters,
   onFilterChange,
-  onClearFilters
+  onClearFilters,
+  availableProjects,
+  availableTasks
 }: TimeHistoryAdvancedFiltersProps) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
@@ -60,7 +93,28 @@ export default function TimeHistoryAdvancedFilters({
     if (filters.hasBreak !== null) count++;
     if (filters.project) count++;
     if (filters.task) count++;
+    if (filters.durationRange) count++;
+    if (filters.hasNotes !== null) count++;
+    if (filters.projects) count++;
+    if (filters.tasks) count++;
+    if (filters.dateRange) count++;
     return count;
+  };
+
+  const handleProjectsChange: AutocompleteChangeHandler = (_, newValue) => {
+    onFilterChange({ projects: newValue });
+  };
+
+  const handleTasksChange: AutocompleteChangeHandler = (_, newValue) => {
+    onFilterChange({ tasks: newValue });
+  };
+
+  const handleDurationChange: SliderChangeHandler = (_, newValue) => {
+    onFilterChange({ durationRange: newValue as [number, number] });
+  };
+
+  const handleNotesChange: SwitchChangeHandler = (e) => {
+    onFilterChange({ hasNotes: e.target.checked });
   };
 
   return (
@@ -178,6 +232,62 @@ export default function TimeHistoryAdvancedFilters({
               value={filters.task}
               onChange={(e) => onFilterChange({ task: e.target.value })}
             />
+            
+            <Box>
+              <Typography gutterBottom>Duration (hours)</Typography>
+              <Slider
+                value={filters.durationRange}
+                onChange={handleDurationChange}
+                valueLabelDisplay="auto"
+                min={0}
+                max={12}
+              />
+            </Box>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={filters.hasNotes === true}
+                  onChange={handleNotesChange}
+                />
+              }
+              label="Has Notes"
+            />
+
+            <Autocomplete
+              multiple
+              options={availableProjects}
+              value={filters.projects}
+              onChange={handleProjectsChange}
+              renderInput={(params) => (
+                <TextField {...params} label="Projects" />
+              )}
+            />
+
+            <Autocomplete
+              multiple
+              options={availableTasks}
+              value={filters.tasks}
+              onChange={handleTasksChange}
+              renderInput={(params) => (
+                <TextField {...params} label="Tasks" />
+              )}
+            />
+
+            <FormControl fullWidth>
+              <InputLabel>Date Range</InputLabel>
+              <Select
+                value={filters.dateRange}
+                onChange={(e) => onFilterChange({ dateRange: e.target.value as typeof DATE_RANGE_OPTIONS[number]['value'] })}
+                label="Date Range"
+              >
+                {DATE_RANGE_OPTIONS.map(option => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
         </Box>
       </Popover>
