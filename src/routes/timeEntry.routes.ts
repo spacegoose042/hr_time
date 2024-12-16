@@ -279,74 +279,59 @@ router.post('/clock-out',
 // Get current user's time entries
 router.get('/entries',
   requireAuth,
-  validateRequest(entriesQuerySchema),
-  async (req, res, next) => {
-    try {
-      const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
-      const employee = req.user as Employee;
-      const { page, limit, startDate, endDate, status } = req.query;
+  wrapAsync(async (req, res) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
 
-      // Parse pagination params with defaults
-      const pageNum = parseInt(page as string) || 1;
-      const limitNum = parseInt(limit as string) || 10;
-      const skip = (pageNum - 1) * limitNum;
+    // Get filter parameters
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
+    const status = req.query.status as string;
+    const searchTerm = req.query.search as string;
 
-      // Build where clause
-      const whereClause: any = {
-        employeeId: employee.id
-      };
+    // Build query
+    const queryBuilder = AppDataSource.getRepository(TimeEntry)
+      .createQueryBuilder('time_entry')
+      .where('time_entry.employeeId = :employeeId', { employeeId: req.user.id })
+      .orderBy('time_entry.clock_in', 'DESC');
 
-      if (startDate) {
-        whereClause.clock_in = MoreThanOrEqual(new Date(startDate as string));
-      }
-
-      if (endDate) {
-        whereClause.clock_in = LessThanOrEqual(new Date(endDate as string));
-      }
-
-      if (status) {
-        whereClause.status = status;
-      }
-
-      // Get total count with filters
-      const total = await timeEntryRepo.count({
-        where: whereClause
-      });
-
-      // Get paginated entries with filters
-      const entries = await timeEntryRepo.find({
-        where: whereClause,
-        order: { clock_in: 'DESC' },
-        skip,
-        take: limitNum,
-        relations: ['employee']
-      });
-
-      // Calculate duration for each entry
-      const entriesWithDuration = entries.map(entry => {
-        if (entry.clock_out) {
-          const duration = new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime();
-          const hours = Math.floor(duration / (1000 * 60 * 60));
-          const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-          return {
-            ...entry,
-            duration: `${hours}:${minutes.toString().padStart(2, '0')}`
-          };
-        }
-        return entry;
-      });
-
-      res.json({
-        entries: entriesWithDuration,
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum)
-      });
-    } catch (error) {
-      next(error);
+    // Apply filters
+    if (startDate) {
+      queryBuilder.andWhere('time_entry.clock_in >= :startDate', { startDate });
     }
-  }
+    if (endDate) {
+      queryBuilder.andWhere('time_entry.clock_in <= :endDate', { endDate });
+    }
+    if (status) {
+      queryBuilder.andWhere('time_entry.status = :status', { status });
+    }
+    if (searchTerm) {
+      queryBuilder.andWhere(
+        '(time_entry.notes ILIKE :search OR time_entry.project ILIKE :search OR time_entry.task ILIKE :search)',
+        { search: `%${searchTerm}%` }
+      );
+    }
+
+    // Get total count for pagination
+    const total = await queryBuilder.getCount();
+
+    // Get paginated results
+    const entries = await queryBuilder
+      .skip(offset)
+      .take(limit)
+      .getMany();
+
+    res.json({
+      status: 'success',
+      data: {
+        entries,
+        total,
+        page,
+        limit
+      }
+    });
+  })
 );
 
 // Get pending entries for manager approval

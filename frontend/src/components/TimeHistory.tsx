@@ -4,11 +4,21 @@ import {
   GridColDef,
   GridRenderCellParams,
   GridRowParams,
-  GridPaginationModel
+  GridPaginationModel,
+  GridFilterInputValue,
+  GridFilterItem
 } from '@mui/x-data-grid';
-import { Box, Paper, Typography } from '@mui/material';
-import { format } from 'date-fns';
+import { Box, Paper, Typography, Chip, Tooltip, IconButton, MenuItem } from '@mui/material';
+import { format, formatDistanceToNow } from 'date-fns';
 import TimeHistoryFilters from './TimeHistoryFilters';
+import { 
+  AccessTime as ClockIcon,
+  Coffee as BreakIcon,
+  CheckCircle as ApprovedIcon,
+  Cancel as RejectedIcon,
+  Pending as PendingIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
 
 export interface TimeEntry {
   id: string;
@@ -21,12 +31,66 @@ export interface TimeEntry {
   task?: string;
 }
 
+// Add status styling
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'approved':
+      return {
+        backgroundColor: '#e8f5e9',
+        color: '#2e7d32',
+        borderColor: '#a5d6a7'
+      };
+    case 'rejected':
+      return {
+        backgroundColor: '#ffebee',
+        color: '#c62828',
+        borderColor: '#ef9a9a'
+      };
+    case 'pending':
+    default:
+      return {
+        backgroundColor: '#fff3e0',
+        color: '#ef6c00',
+        borderColor: '#ffcc80'
+      };
+  }
+};
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'approved':
+      return <ApprovedIcon fontSize="small" />;
+    case 'rejected':
+      return <RejectedIcon fontSize="small" />;
+    default:
+      return <PendingIcon fontSize="small" />;
+  }
+};
+
+const formatDuration = (start: Date, end: Date | null, breakMinutes: number = 0) => {
+  if (!end) return 'In progress';
+  const diffMs = end.getTime() - start.getTime() - (breakMinutes * 60 * 1000);
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hours}h ${minutes}m`;
+};
+
 const columns: GridColDef[] = [
   {
     field: 'clock_in',
     headerName: 'Clock In',
     width: 200,
-    valueFormatter: (params: GridRenderCellParams) => format(new Date(params.value), 'PPpp')
+    renderCell: (params: GridRenderCellParams) => (
+      <Tooltip 
+        title={`${formatDistanceToNow(new Date(params.value))} ago`}
+        arrow
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ClockIcon fontSize="small" color="action" />
+          {format(new Date(params.value), 'PPpp')}
+        </Box>
+      </Tooltip>
+    )
   },
   {
     field: 'clock_out',
@@ -52,16 +116,73 @@ const columns: GridColDef[] = [
   {
     field: 'break_minutes',
     headerName: 'Break',
-    width: 100,
-    valueFormatter: (params: GridRenderCellParams) => 
-      params.value ? `${params.value} min` : 'No break'
+    width: 120,
+    renderCell: (params: GridRenderCellParams) => {
+      if (!params.value) return 'No break';
+      return (
+        <Tooltip 
+          title={params.row.break_notes || 'No break notes'}
+          arrow
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <BreakIcon fontSize="small" color="action" />
+            {`${params.value} min`}
+          </Box>
+        </Tooltip>
+      );
+    }
   },
   {
     field: 'status',
     headerName: 'Status',
-    width: 120,
-    valueFormatter: (params: GridRenderCellParams) => 
-      params.value.charAt(0).toUpperCase() + params.value.slice(1)
+    width: 150,
+    filterOperators: [
+      {
+        label: 'Status',
+        value: 'status',
+        getApplyFilterFn: (filterItem: GridFilterItem) => {
+          if (!filterItem.value) return null;
+          return (params): boolean => params.value === filterItem.value;
+        },
+        InputComponent: GridFilterInputValue,
+        InputComponentProps: {
+          select: true,
+          children: [
+            { value: 'pending', label: 'Pending' },
+            { value: 'approved', label: 'Approved' },
+            { value: 'rejected', label: 'Rejected' }
+          ].map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))
+        }
+      }
+    ],
+    renderCell: (params: GridRenderCellParams) => {
+      const status = params.value as string;
+      const colors = getStatusColor(status);
+      
+      return (
+        <Tooltip 
+          title={`Last updated: ${format(new Date(params.row.updated_at || params.row.clock_in), 'PPpp')}`}
+          arrow
+        >
+          <Chip
+            icon={getStatusIcon(status)}
+            label={status.charAt(0).toUpperCase() + status.slice(1)}
+            size="small"
+            sx={{
+              ...colors,
+              fontWeight: 500,
+              '& .MuiChip-label': {
+                px: 2
+              }
+            }}
+          />
+        </Tooltip>
+      );
+    }
   },
   {
     field: 'project',
@@ -77,10 +198,40 @@ const columns: GridColDef[] = [
     field: 'notes',
     headerName: 'Notes',
     width: 300,
-    valueFormatter: (params: GridRenderCellParams) => 
-      params.value || 'No notes'
+    renderCell: (params: GridRenderCellParams) => {
+      const notes = params.value as string;
+      if (!notes) return 'No notes';
+      
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography noWrap>{notes}</Typography>
+          {notes.length > 40 && (
+            <Tooltip title={notes} arrow>
+              <IconButton size="small">
+                <InfoIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      );
+    }
   }
 ];
+
+// Add row styling
+const getRowStyle = (params: GridRowParams<TimeEntry>) => {
+  let style = '';
+  
+  if (!params.row.clock_out) {
+    style += 'in-progress';
+  }
+  
+  if (params.row.break_minutes && params.row.break_minutes > 0) {
+    style += ' has-break';
+  }
+  
+  return style;
+};
 
 interface TimeHistoryProps {
   entries: TimeEntry[];
@@ -140,9 +291,20 @@ export default function TimeHistory({
           paginationMode="server"
           autoHeight
           disableRowSelectionOnClick
-          getRowClassName={(params: GridRowParams<TimeEntry>) => {
-            if (!params.row.clock_out) return 'in-progress';
-            return '';
+          getRowClassName={getRowStyle}
+          sx={{
+            '& .in-progress': {
+              bgcolor: '#f5f5f5',
+            },
+            '& .has-break': {
+              fontStyle: 'italic',
+            },
+            '& .MuiDataGrid-cell:focus': {
+              outline: 'none',
+            },
+            '& .MuiDataGrid-row:hover': {
+              bgcolor: 'rgba(0, 0, 0, 0.04)',
+            }
           }}
         />
       </Paper>
