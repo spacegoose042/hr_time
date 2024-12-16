@@ -21,7 +21,9 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.28.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "@mui/x-data-grid": "^6.0.0",
+    "@mui/x-date-pickers": "^6.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.48",
@@ -30,6 +32,7 @@
     "@typescript-eslint/parser": "^6.19.1",
     "@vitejs/plugin-react": "^4.2.1",
     "typescript": "^5.3.3",
-    "vite": "^5.0.12"
+    "vite": "^5.0.12",
+    "@types/file-saver": "^2.0.5"
   }
 }
