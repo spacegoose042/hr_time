@@ -180,6 +180,15 @@ const wrapAsync = (fn: AsyncRequestHandler): RequestHandler => {
   };
 };
 
+// Add type for the extended Request with user
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+    role: UserRole;
+    // ... other user properties
+  };
+}
+
 // Clock in
 router.post('/clock-in',
   requireAuth,
@@ -279,7 +288,7 @@ router.post('/clock-out',
 // Get current user's time entries
 router.get('/entries',
   requireAuth,
-  wrapAsync(async (req, res) => {
+  wrapAsync(async (req: AuthenticatedRequest, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;

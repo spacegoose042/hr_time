@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   DataGrid, 
   GridColDef,
@@ -8,7 +8,7 @@ import {
   GridFilterInputValue,
   GridFilterItem
 } from '@mui/x-data-grid';
-import { Box, Paper, Typography, Chip, Tooltip, IconButton, MenuItem } from '@mui/material';
+import { Box, Paper, Typography, Chip, Tooltip, IconButton, MenuItem, Menu, ListItemIcon, ListItemText } from '@mui/material';
 import { format, formatDistanceToNow } from 'date-fns';
 import TimeHistoryFilters from './TimeHistoryFilters';
 import { 
@@ -17,7 +17,11 @@ import {
   CheckCircle as ApprovedIcon,
   Cancel as RejectedIcon,
   Pending as PendingIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Edit as EditIcon,
+  CheckCircleOutline as ApproveIcon,
+  Block as RejectIcon,
+  MoreVert as MoreIcon
 } from '@mui/icons-material';
 
 export interface TimeEntry {
@@ -75,7 +79,94 @@ const formatDuration = (start: Date, end: Date | null, breakMinutes: number = 0)
   return `${hours}h ${minutes}m`;
 };
 
-const columns: GridColDef[] = [
+const ActionCell = ({ 
+  row,
+  onEditEntry,
+  onApproveEntry,
+  onRejectEntry,
+  userRole 
+}: {
+  row: TimeEntry;
+  onEditEntry?: (entry: TimeEntry) => void;
+  onApproveEntry?: (entry: TimeEntry) => void;
+  onRejectEntry?: (entry: TimeEntry) => void;
+  userRole?: 'employee' | 'manager' | 'admin';
+}) => {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+  
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+  };
+  
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleAction = (action: 'edit' | 'approve' | 'reject') => {
+    handleClose();
+    switch (action) {
+      case 'edit':
+        onEditEntry?.(row);
+        break;
+      case 'approve':
+        onApproveEntry?.(row);
+        break;
+      case 'reject':
+        onRejectEntry?.(row);
+        break;
+    }
+  };
+
+  return (
+    <>
+      <Tooltip title="Actions" arrow>
+        <IconButton onClick={handleClick} size="small">
+          <MoreIcon />
+        </IconButton>
+      </Tooltip>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {userRole === 'manager' && row.status === 'pending' && (
+          <>
+            <MenuItem onClick={() => handleAction('approve')}>
+              <ListItemIcon>
+                <ApproveIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Approve</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleAction('reject')}>
+              <ListItemIcon>
+                <RejectIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Reject</ListItemText>
+            </MenuItem>
+          </>
+        )}
+        {!row.clock_out && (
+          <MenuItem onClick={() => handleAction('edit')}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Edit</ListItemText>
+          </MenuItem>
+        )}
+      </Menu>
+    </>
+  );
+};
+
+const createColumns = (
+  onEditEntry?: (entry: TimeEntry) => void,
+  onApproveEntry?: (entry: TimeEntry) => void,
+  onRejectEntry?: (entry: TimeEntry) => void,
+  userRole?: 'employee' | 'manager' | 'admin'
+): GridColDef[] => [
   {
     field: 'clock_in',
     headerName: 'Clock In',
@@ -96,8 +187,32 @@ const columns: GridColDef[] = [
     field: 'clock_out',
     headerName: 'Clock Out',
     width: 200,
-    valueFormatter: (params: GridRenderCellParams) => 
-      params.value ? format(new Date(params.value), 'PPpp') : 'Not clocked out'
+    renderCell: (params: GridRenderCellParams) => {
+      if (!params.value) return (
+        <Tooltip title="Still clocked in" arrow>
+          <Box sx={{ display: 'flex', alignItems: 'center', color: 'warning.main' }}>
+            <ClockIcon fontSize="small" sx={{ mr: 1 }} />
+            Not clocked out
+          </Box>
+        </Tooltip>
+      );
+      
+      return (
+        <Tooltip 
+          title={`Duration: ${formatDuration(
+            new Date(params.row.clock_in),
+            new Date(params.value),
+            params.row.break_minutes
+          )}`}
+          arrow
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ClockIcon fontSize="small" color="action" />
+            {format(new Date(params.value), 'PPpp')}
+          </Box>
+        </Tooltip>
+      );
+    }
   },
   {
     field: 'duration',
@@ -215,6 +330,22 @@ const columns: GridColDef[] = [
         </Box>
       );
     }
+  },
+  {
+    field: 'actions',
+    headerName: 'Actions',
+    width: 100,
+    sortable: false,
+    filterable: false,
+    renderCell: (params: GridRenderCellParams) => (
+      <ActionCell
+        row={params.row}
+        onEditEntry={onEditEntry}
+        onApproveEntry={onApproveEntry}
+        onRejectEntry={onRejectEntry}
+        userRole={userRole}
+      />
+    )
   }
 ];
 
@@ -249,6 +380,10 @@ interface TimeHistoryProps {
   };
   onFilterChange: (filters: Partial<TimeHistoryProps['filters']>) => void;
   onClearFilters: () => void;
+  onEditEntry?: (entry: TimeEntry) => void;
+  onApproveEntry?: (entry: TimeEntry) => void;
+  onRejectEntry?: (entry: TimeEntry) => void;
+  userRole?: 'employee' | 'manager' | 'admin';
 }
 
 export default function TimeHistory({
@@ -261,8 +396,14 @@ export default function TimeHistory({
   onPaginationModelChange,
   filters,
   onFilterChange,
-  onClearFilters
+  onClearFilters,
+  onEditEntry,
+  onApproveEntry,
+  onRejectEntry,
+  userRole
 }: TimeHistoryProps) {
+  const columns = createColumns(onEditEntry, onApproveEntry, onRejectEntry, userRole);
+  
   return (
     <Box sx={{ height: 600, width: '100%' }}>
       <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
