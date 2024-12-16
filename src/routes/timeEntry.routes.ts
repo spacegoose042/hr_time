@@ -167,6 +167,17 @@ const validateTimeEntry = async (
   return warnings;
 };
 
+// Update the asyncHandler to focus on void returns
+const asyncHandler = (fn: (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => Promise<void>): RequestHandler => 
+  (req, res, next): void => {
+    Promise.resolve(fn(req, res, next))
+      .catch(next);
+  };
+
 // Clock in
 router.post('/clock-in',
   requireAuth,
@@ -571,7 +582,7 @@ router.get('/current',
 router.patch('/current',
   requireAuth,
   validateRequest(updateCurrentSchema),
-  (async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req, res, next): Promise<void> => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
@@ -654,12 +665,10 @@ router.patch('/current',
           breakMinutes: updatedEntry.break_minutes || 0
         }
       });
-      return;
     } catch (error) {
       next(error);
-      return;
     }
-  }) as RequestHandler
+  })
 );
 
 router.post('/force-close',
@@ -784,7 +793,7 @@ router.post('/force-close',
 router.get('/audit-logs',
   requireAuth,
   requireRole(UserRole.MANAGER),
-  (async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req, res, next): Promise<void> => {
     try {
       const auditRepo = AppDataSource.getRepository(AuditLog);
       const { timeEntryId } = req.query;
@@ -807,13 +816,11 @@ router.get('/audit-logs',
         status: 'success',
         data: logs
       });
-      return;
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       next(error);
-      return;
     }
-  }) as RequestHandler
+  })
 );
 
 export default router; 
