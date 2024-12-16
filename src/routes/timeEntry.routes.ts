@@ -644,7 +644,7 @@ router.patch('/current',
       const netDurationMs = durationMs - breakMs;
       const durationHours = netDurationMs / (1000 * 60 * 60);
 
-      return res.json({
+      res.json({
         status: 'success',
         data: updatedEntry,
         duration: {
@@ -803,13 +803,15 @@ router.get('/audit-logs',
       const logs = await query.getMany();
       console.log('Found audit logs:', logs);
 
-      return res.json({
+      res.json({
         status: 'success',
         data: logs
       });
+      return;
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      return next(error);
+      next(error);
+      return;
     }
   }) as RequestHandler
 );
