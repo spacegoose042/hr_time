@@ -102,8 +102,11 @@ interface TimeHistoryProps {
 
 export default function TimeHistory({
   entries,
-  isLoading,
+  todayTotal,
+  weekTotal,
+  totalCount,
   paginationModel,
+  isLoading,
   onPaginationModelChange,
   filters,
   onFilterChange,
@@ -112,14 +115,20 @@ export default function TimeHistory({
   return (
     <Box sx={{ height: 600, width: '100%' }}>
       <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h5" gutterBottom>
-          Time Entry History
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="h5">Time Entry History</Typography>
+          <Box>
+            <Typography variant="body2">Today's Total: {todayTotal}</Typography>
+            <Typography variant="body2">Week's Total: {weekTotal}</Typography>
+          </Box>
+        </Box>
+        
         <TimeHistoryFilters
           filters={filters}
           onFilterChange={onFilterChange}
           onClearFilters={onClearFilters}
         />
+
         <DataGrid
           rows={entries}
           columns={columns}
@@ -127,6 +136,8 @@ export default function TimeHistory({
           pageSizeOptions={[5, 10, 25, 50]}
           paginationModel={paginationModel}
           onPaginationModelChange={onPaginationModelChange}
+          rowCount={totalCount}
+          paginationMode="server"
           autoHeight
           disableRowSelectionOnClick
           getRowClassName={(params: GridRowParams<TimeEntry>) => {
