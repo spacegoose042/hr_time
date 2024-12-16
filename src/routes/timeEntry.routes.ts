@@ -167,6 +167,19 @@ const validateTimeEntry = async (
   return warnings;
 };
 
+// Add this at the top of the file
+type AsyncRequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => Promise<unknown>;
+
+const wrapAsync = (fn: AsyncRequestHandler): RequestHandler => {
+  return function(req: Request, res: Response, next: NextFunction) {
+    fn(req, res, next).catch(next);
+  };
+};
+
 // Clock in
 router.post('/clock-in',
   requireAuth,
@@ -572,95 +585,89 @@ router.patch(
   '/current',
   requireAuth,
   validateRequest(updateCurrentSchema),
-  (async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
-      const employee = req.user as Employee;
+  wrapAsync(async (req, res) => {
+    const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
+    const employee = req.user as Employee;
 
-      const openEntry = await timeEntryRepo.findOne({
-        where: {
-          employeeId: employee.id,
-          clock_out: IsNull()
-        },
-        relations: ['employee']
-      });
+    const openEntry = await timeEntryRepo.findOne({
+      where: {
+        employeeId: employee.id,
+        clock_out: IsNull()
+      },
+      relations: ['employee']
+    });
 
-      if (!openEntry) {
-        throw new ApiError('No open time entry found', 404);
-      }
-
-      // Update notes if provided
-      if (req.body.notes) {
-        openEntry.notes = openEntry.notes
-          ? `${openEntry.notes}\nUpdate: ${req.body.notes}`
-          : req.body.notes;
-      }
-
-      // Update clock-in time if provided (with validation)
-      if (req.body.clockIn) {
-        const newClockIn = new Date(req.body.clockIn);
-        const now = new Date();
-        
-        // Validate new clock-in time
-        if (newClockIn > now) {
-          throw new ApiError('Clock-in time cannot be in the future', 400);
-        }
-
-        // Check for overlaps with the new time
-        const hasOverlap = await hasOverlappingEntry(
-          timeEntryRepo,
-          employee.id,
-          newClockIn
-        );
-
-        if (hasOverlap) {
-          throw new ApiError('This clock-in time would create an overlap', 400);
-        }
-
-        openEntry.clock_in = newClockIn;
-      }
-
-      // Update project/task if provided
-      if (req.body.project) {
-        openEntry.project = req.body.project;
-      }
-      if (req.body.task) {
-        openEntry.task = req.body.task;
-      }
-
-      // Update break time if provided
-      if (req.body.breakMinutes !== undefined) {
-        openEntry.break_minutes = req.body.breakMinutes;
-        if (req.body.breakNotes) {
-          openEntry.break_notes = req.body.breakNotes;
-        }
-      }
-
-      const updatedEntry = await timeEntryRepo.save(openEntry);
-
-      // Calculate duration (excluding break time)
-      const now = new Date();
-      const durationMs = now.getTime() - new Date(updatedEntry.clock_in).getTime();
-      const breakMs = (updatedEntry.break_minutes || 0) * 60 * 1000;
-      const netDurationMs = durationMs - breakMs;
-      const durationHours = netDurationMs / (1000 * 60 * 60);
-
-      res.json({
-        status: 'success',
-        data: updatedEntry,
-        duration: {
-          hours: Number(durationHours.toFixed(2)),
-          minutes: Math.floor((netDurationMs / (1000 * 60)) % 60),
-          seconds: Math.floor((netDurationMs / 1000) % 60),
-          breakMinutes: updatedEntry.break_minutes || 0
-        }
-      });
-      return;
-    } catch (error) {
-      next(error);
-      return;
+    if (!openEntry) {
+      throw new ApiError('No open time entry found', 404);
     }
-  }) as RequestHandler
+
+    // Update notes if provided
+    if (req.body.notes) {
+      openEntry.notes = openEntry.notes
+        ? `${openEntry.notes}\nUpdate: ${req.body.notes}`
+        : req.body.notes;
+    }
+
+    // Update clock-in time if provided (with validation)
+    if (req.body.clockIn) {
+      const newClockIn = new Date(req.body.clockIn);
+      const now = new Date();
+      
+      // Validate new clock-in time
+      if (newClockIn > now) {
+        throw new ApiError('Clock-in time cannot be in the future', 400);
+      }
+
+      // Check for overlaps with the new time
+      const hasOverlap = await hasOverlappingEntry(
+        timeEntryRepo,
+        employee.id,
+        newClockIn
+      );
+
+      if (hasOverlap) {
+        throw new ApiError('This clock-in time would create an overlap', 400);
+      }
+
+      openEntry.clock_in = newClockIn;
+    }
+
+    // Update project/task if provided
+    if (req.body.project) {
+      openEntry.project = req.body.project;
+    }
+    if (req.body.task) {
+      openEntry.task = req.body.task;
+    }
+
+    // Update break time if provided
+    if (req.body.breakMinutes !== undefined) {
+      openEntry.break_minutes = req.body.breakMinutes;
+      if (req.body.breakNotes) {
+        openEntry.break_notes = req.body.breakNotes;
+      }
+    }
+
+    const updatedEntry = await timeEntryRepo.save(openEntry);
+
+    // Calculate duration (excluding break time)
+    const now = new Date();
+    const durationMs = now.getTime() - new Date(updatedEntry.clock_in).getTime();
+    const breakMs = (updatedEntry.break_minutes || 0) * 60 * 1000;
+    const netDurationMs = durationMs - breakMs;
+    const durationHours = netDurationMs / (1000 * 60 * 60);
+
+    res.json({
+      status: 'success',
+      data: updatedEntry,
+      duration: {
+        hours: Number(durationHours.toFixed(2)),
+        minutes: Math.floor((netDurationMs / (1000 * 60)) % 60),
+        seconds: Math.floor((netDurationMs / 1000) % 60),
+        breakMinutes: updatedEntry.break_minutes || 0
+      }
+    });
+  })
 );
 
 router.post('/force-close',
@@ -786,32 +793,26 @@ router.get(
   '/audit-logs',
   requireAuth,
   requireRole(UserRole.MANAGER),
-  (async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const auditRepo = AppDataSource.getRepository(AuditLog);
-      const { timeEntryId } = req.query;
+  wrapAsync(async (req, res) => {
+    const auditRepo = AppDataSource.getRepository(AuditLog);
+    const { timeEntryId } = req.query;
 
-      const query = auditRepo.createQueryBuilder('audit')
-        .leftJoinAndSelect('audit.actor', 'actor')
-        .leftJoinAndSelect('audit.timeEntry', 'timeEntry')
-        .orderBy('audit.created_at', 'DESC');
+    const query = auditRepo.createQueryBuilder('audit')
+      .leftJoinAndSelect('audit.actor', 'actor')
+      .leftJoinAndSelect('audit.timeEntry', 'timeEntry')
+      .orderBy('audit.created_at', 'DESC');
 
-      if (timeEntryId) {
-        query.where('audit.time_entry_id = :timeEntryId', { timeEntryId });
-      }
-
-      const logs = await query.getMany();
-
-      res.json({
-        status: 'success',
-        data: logs
-      });
-      return;
-    } catch (error) {
-      next(error);
-      return;
+    if (timeEntryId) {
+      query.where('audit.time_entry_id = :timeEntryId', { timeEntryId });
     }
-  }) as RequestHandler
+
+    const logs = await query.getMany();
+
+    res.json({
+      status: 'success',
+      data: logs
+    });
+  })
 );
 
 export default router; 
