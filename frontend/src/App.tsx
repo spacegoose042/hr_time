@@ -9,6 +9,7 @@ import TimeClock from './pages/TimeClock';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AuditLogs from './pages/admin/AuditLogs';
 
 // Temporary placeholder components
 const Login = () => <div>Login</div>;
@@ -38,6 +39,11 @@ const App: React.FC = () => {
                 </PrivateRoute>
               } />
             </Route>
+            <Route path="/admin/audit-logs" element={
+              <PrivateRoute>
+                <AuditLogs />
+              </PrivateRoute>
+            } />
           </Routes>
         </Router>
       </LocalizationProvider>

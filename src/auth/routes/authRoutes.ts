@@ -13,6 +13,8 @@ import { sendPasswordResetEmail } from '../services/emailService';
 import rateLimit from 'express-rate-limit';
 import { PasswordValidationService } from '../services/passwordValidationService';
 import { PasswordHistoryService } from '../services/passwordHistoryService';
+import { AuditService } from '../services/auditService';
+import { AuditAction } from '../../entities/AuditLog';
 
 const router = Router();
 const authService = new AuthService();
@@ -206,12 +208,36 @@ router.post(
         newPasswordHash
       );
 
+      // Log the password reset
+      await AuditService.log(
+        employee.id,
+        AuditAction.PASSWORD_RESET,
+        {
+          method: 'reset-token',
+          passwordStrength: validation.strength,
+          wasReused: false
+        },
+        req
+      );
+
       res.json({
         status: 'success',
         message: 'Password has been reset successfully',
         passwordStrength: validation.strength
       });
     } catch (error) {
+      // Log failed attempts
+      if (error instanceof ApiError && employee) {
+        await AuditService.log(
+          employee.id,
+          AuditAction.FAILED_PASSWORD_ATTEMPT,
+          {
+            method: 'reset-token',
+            error: error.message
+          },
+          req
+        );
+      }
       next(error);
     }
   }

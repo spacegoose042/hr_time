@@ -1,13 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from 'typeorm';
 import { Employee } from './Employee';
-import { TimeEntry } from './TimeEntry';
 
 export enum AuditAction {
-  FORCE_CLOSE = 'force_close',
-  OVERRIDE_VALIDATION = 'override_validation',
-  BULK_UPDATE = 'bulk_update',
-  TIME_ADJUSTMENT = 'time_adjustment',
-  STATUS_CHANGE = 'status_change'
+  PASSWORD_RESET = 'PASSWORD_RESET',
+  PASSWORD_CHANGE = 'PASSWORD_CHANGE',
+  FAILED_PASSWORD_ATTEMPT = 'FAILED_PASSWORD_ATTEMPT',
+  ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
+  ACCOUNT_UNLOCKED = 'ACCOUNT_UNLOCKED'
 }
 
 @Entity('audit_logs')
@@ -15,19 +14,11 @@ export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Employee, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'actor_id' })
-  actor: Employee;
+  @Column()
+  employeeId: string;
 
-  @Column('uuid')
-  actor_id: string;
-
-  @ManyToOne(() => TimeEntry, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'time_entry_id' })
-  timeEntry: TimeEntry;
-
-  @Column('uuid')
-  time_entry_id: string;
+  @ManyToOne(() => Employee)
+  employee: Employee;
 
   @Column({
     type: 'enum',
@@ -35,40 +26,14 @@ export class AuditLog {
   })
   action: AuditAction;
 
-  @Column('jsonb')
-  changes: any;
-
-  @Column('text')
-  reason: string;
-
   @Column('jsonb', { nullable: true })
-  override_details?: any;
+  metadata: Record<string, any>;
 
-  @Column('inet', { nullable: true })
+  @Column({ nullable: true })
   ip_address: string;
 
-  @Column('text', { nullable: true })
+  @Column({ nullable: true })
   user_agent: string;
-
-  @Column('jsonb', { nullable: true })
-  metadata: {
-    browser?: string;
-    os?: string;
-    device?: string;
-    location?: {
-      city?: string;
-      country?: string;
-    };
-  };
-
-  @Column('text', { nullable: true })
-  session_id: string;
-
-  @Column('boolean', { default: false })
-  requires_review: boolean;
-
-  @Column('text', { array: true, default: '{}' })
-  tags: string[];
 
   @CreateDateColumn()
   created_at: Date;
