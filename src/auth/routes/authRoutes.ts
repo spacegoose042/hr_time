@@ -15,6 +15,8 @@ import { PasswordValidationService } from '../services/passwordValidationService
 import { PasswordHistoryService } from '../services/passwordHistoryService';
 import { AuditService } from '../services/auditService';
 import { AuditAction } from '../../entities/AuditLog';
+import { MoreThanOrEqual } from 'typeorm';
+import { verify } from 'jsonwebtoken';
 
 const router = Router();
 const authService = new AuthService();
@@ -99,12 +101,12 @@ router.post(
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
       await sendPasswordResetEmail(employee.email, resetUrl);
 
-      res.json({
+      return res.json({
         status: 'success',
         message: 'Password reset instructions sent to your email'
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -147,6 +149,7 @@ router.post(
   '/reset-password/:token',
   validateRequest(resetPasswordSchema),
   async (req, res, next) => {
+    let employee: Employee | null = null;
     try {
       const { token } = req.params;
       const { password } = req.body;
@@ -165,7 +168,7 @@ router.post(
       const employeeRepo = AppDataSource.getRepository(Employee);
 
       // Find employee with non-expired reset token
-      const employee = await employeeRepo.findOne({
+      employee = await employeeRepo.findOne({
         where: {
           reset_token_expires: MoreThanOrEqual(new Date())
         }

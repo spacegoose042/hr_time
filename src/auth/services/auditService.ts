@@ -1,6 +1,14 @@
 import { Request } from 'express';
 import AppDataSource from '../../db/connection';
 import { AuditLog, AuditAction } from '../../entities/AuditLog';
+import { In, MoreThanOrEqual } from 'typeorm';
+
+interface GetLogsOptions {
+  startDate?: Date;
+  endDate?: Date;
+  action?: string;
+  searchTerm?: string;
+}
 
 export class AuditService {
   static async log(
@@ -29,7 +37,7 @@ export class AuditService {
     return auditRepo.find({
       where: {
         employeeId,
-        action: [AuditAction.PASSWORD_RESET, AuditAction.PASSWORD_CHANGE]
+        action: In([AuditAction.PASSWORD_RESET, AuditAction.PASSWORD_CHANGE])
       },
       order: { created_at: 'DESC' },
       take: limit
@@ -53,5 +61,23 @@ export class AuditService {
     });
 
     return attempts;
+  }
+
+  static async getLogs(options: GetLogsOptions): Promise<AuditLog[]> {
+    const auditRepo = AppDataSource.getRepository(AuditLog);
+    const where: any = {};
+    
+    if (options.startDate) {
+      where.created_at = MoreThanOrEqual(options.startDate);
+    }
+    if (options.action) {
+      where.action = options.action;
+    }
+    
+    return auditRepo.find({
+      where,
+      relations: ['employee'],
+      order: { created_at: 'DESC' }
+    });
   }
 } 

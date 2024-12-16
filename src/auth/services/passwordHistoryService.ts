@@ -1,7 +1,7 @@
 import { compare } from 'bcryptjs';
 import AppDataSource from '../../db/connection';
 import { PasswordHistory } from '../../entities/PasswordHistory';
-import { Employee } from '../../entities/Employee';
+import { MoreThanOrEqual } from 'typeorm';
 
 export class PasswordHistoryService {
   private static readonly HISTORY_LIMIT = 5; // Number of previous passwords to check

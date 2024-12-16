@@ -2,10 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import { AuditService } from '../auth/services/auditService';
 import { AuditAction } from '../entities/AuditLog';
 import { ApiError } from './errorHandler';
+import AppDataSource from '../db/connection';
+import { Employee } from '../entities/Employee';
 
 export const trackFailedLogins = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {

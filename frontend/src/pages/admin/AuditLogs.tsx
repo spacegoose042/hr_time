@@ -21,16 +21,22 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Button
+  Button,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  CircularProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import {
   FilterList as FilterIcon,
   Info as InfoIcon,
   Close as CloseIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { AuditAction } from '../../types/audit';
+import { ExportService } from '../../services/exportService';
 
 interface AuditLog {
   id: string;
@@ -55,6 +61,11 @@ interface FilterState {
   searchTerm: string;
 }
 
+interface ExportMenuState {
+  anchorEl: HTMLElement | null;
+  loading: boolean;
+}
+
 const AuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [page, setPage] = useState(0);
@@ -70,6 +81,10 @@ const AuditLogs: React.FC = () => {
     searchTerm: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [exportMenu, setExportMenu] = useState<ExportMenuState>({
+    anchorEl: null,
+    loading: false
+  });
 
   const fetchLogs = async () => {
     setIsLoading(true);
@@ -132,64 +147,123 @@ const AuditLogs: React.FC = () => {
       .join(', ');
   };
 
+  const handleExportClick = (event: React.MouseEvent<HTMLElement>) => {
+    setExportMenu(prev => ({ ...prev, anchorEl: event.currentTarget }));
+  };
+
+  const handleExportClose = () => {
+    setExportMenu(prev => ({ ...prev, anchorEl: null }));
+  };
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    setExportMenu(prev => ({ ...prev, loading: true }));
+    try {
+      await ExportService.exportAuditLogs(format, {
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        action: filters.action || undefined,
+        searchTerm: filters.searchTerm
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setExportMenu({ anchorEl: null, loading: false });
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h5">Audit Logs</Typography>
-        <Button
-          startIcon={<FilterIcon />}
-          onClick={() => setFilterOpen(true)}
-          variant="outlined"
-        >
-          Filters
-        </Button>
+        <Box>
+          <Button
+            startIcon={<FilterIcon />}
+            onClick={() => setFilterOpen(true)}
+            variant="outlined"
+            sx={{ mr: 1 }}
+          >
+            Filters
+          </Button>
+          <Button
+            startIcon={<DownloadIcon />}
+            onClick={handleExportClick}
+            variant="outlined"
+            disabled={exportMenu.loading}
+          >
+            {exportMenu.loading ? 'Exporting...' : 'Export'}
+          </Button>
+          <Menu
+            anchorEl={exportMenu.anchorEl}
+            open={Boolean(exportMenu.anchorEl)}
+            onClose={handleExportClose}
+          >
+            <MenuItem onClick={() => handleExport('csv')} disabled={exportMenu.loading}>
+              <ListItemIcon>
+                <DownloadIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Export as CSV</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleExport('json')} disabled={exportMenu.loading}>
+              <ListItemIcon>
+                <DownloadIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Export as JSON</ListItemText>
+            </MenuItem>
+          </Menu>
+        </Box>
       </Box>
 
       <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Date</TableCell>
-              <TableCell>Action</TableCell>
-              <TableCell>User</TableCell>
-              <TableCell>Details</TableCell>
-              <TableCell>IP Address</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {logs.map((log) => (
-              <TableRow key={log.id}>
-                <TableCell>
-                  {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss')}
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={log.action}
-                    color={getActionColor(log.action)}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  {log.employee.first_name} {log.employee.last_name}
-                  <Typography variant="caption" display="block" color="textSecondary">
-                    {log.employee.email}
-                  </Typography>
-                </TableCell>
-                <TableCell>{formatMetadata(log.metadata)}</TableCell>
-                <TableCell>{log.ip_address}</TableCell>
-                <TableCell>
-                  <IconButton
-                    size="small"
-                    onClick={() => setSelectedLog(log)}
-                  >
-                    <InfoIcon />
-                  </IconButton>
-                </TableCell>
+        {isLoading ? (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Date</TableCell>
+                <TableCell>Action</TableCell>
+                <TableCell>User</TableCell>
+                <TableCell>Details</TableCell>
+                <TableCell>IP Address</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {logs.map((log) => (
+                <TableRow key={log.id}>
+                  <TableCell>
+                    {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss')}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={log.action}
+                      color={getActionColor(log.action)}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {log.employee.first_name} {log.employee.last_name}
+                    <Typography variant="caption" display="block" color="textSecondary">
+                      {log.employee.email}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{formatMetadata(log.metadata)}</TableCell>
+                  <TableCell>{log.ip_address}</TableCell>
+                  <TableCell>
+                    <IconButton
+                      size="small"
+                      onClick={() => setSelectedLog(log)}
+                    >
+                      <InfoIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
         <TablePagination
           component="div"
           count={totalCount}
