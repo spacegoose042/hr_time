@@ -2,6 +2,13 @@ import { TimeEntry } from '../components/TimeHistory';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
+interface ExportOptions {
+  startDate?: Date;
+  endDate?: Date;
+  action?: string;
+  searchTerm?: string;
+}
+
 export const exportToCSV = (entries: TimeEntry[]) => {
   const csvData = entries.map(entry => ({
     'Clock In': new Date(entry.clock_in).toLocaleString(),
@@ -38,6 +45,36 @@ const calculateDuration = (entry: TimeEntry): string => {
 
 export class ExportService {
   static async exportAuditLogs(format: 'csv' | 'json', options: ExportOptions = {}) {
-    // ... implementation
+    try {
+      const queryParams = new URLSearchParams({
+        format,
+        ...(options.startDate && { startDate: options.startDate.toISOString() }),
+        ...(options.endDate && { endDate: options.endDate.toISOString() }),
+        ...(options.action && { action: options.action }),
+        ...(options.searchTerm && { search: options.searchTerm })
+      });
+
+      const response = await fetch(`/api/admin/audit-logs/export?${queryParams}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to export audit logs');
+      }
+
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `audit_logs_${timestamp}.${format}`;
+
+      if (format === 'json') {
+        const data = await response.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        saveAs(blob, filename);
+      } else {
+        const text = await response.text();
+        const blob = new Blob([text], { type: 'text/csv' });
+        saveAs(blob, filename);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      throw error;
+    }
   }
 } 
