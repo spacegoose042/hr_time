@@ -167,17 +167,6 @@ const validateTimeEntry = async (
   return warnings;
 };
 
-// Update the asyncHandler to focus on void returns
-const asyncHandler = (fn: (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => Promise<void>): RequestHandler => 
-  (req, res, next): void => {
-    Promise.resolve(fn(req, res, next))
-      .catch(next);
-  };
-
 // Clock in
 router.post('/clock-in',
   requireAuth,
@@ -579,10 +568,11 @@ router.get('/current',
   }) as RequestHandler
 );
 
-router.patch('/current',
+router.patch(
+  '/current',
   requireAuth,
   validateRequest(updateCurrentSchema),
-  asyncHandler(async (req, res, next): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
@@ -668,7 +658,7 @@ router.patch('/current',
     } catch (error) {
       next(error);
     }
-  })
+  }
 );
 
 router.post('/force-close',
@@ -790,15 +780,14 @@ router.post('/force-close',
 );
 
 // Add an endpoint to view audit logs
-router.get('/audit-logs',
+router.get(
+  '/audit-logs',
   requireAuth,
   requireRole(UserRole.MANAGER),
-  asyncHandler(async (req, res, next): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const auditRepo = AppDataSource.getRepository(AuditLog);
       const { timeEntryId } = req.query;
-
-      console.log('Fetching audit logs for timeEntryId:', timeEntryId);
 
       const query = auditRepo.createQueryBuilder('audit')
         .leftJoinAndSelect('audit.actor', 'actor')
@@ -810,17 +799,15 @@ router.get('/audit-logs',
       }
 
       const logs = await query.getMany();
-      console.log('Found audit logs:', logs);
 
       res.json({
         status: 'success',
         data: logs
       });
     } catch (error) {
-      console.error('Error fetching audit logs:', error);
       next(error);
     }
-  })
+  }
 );
 
 export default router; 
