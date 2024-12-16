@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Employee } from './Employee';
 import { TimeEntry } from './TimeEntry';
 
@@ -14,32 +14,32 @@ export enum AuditAction {
 
 @Entity('audit_logs')
 export class AuditLog {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
+  @PrimaryGeneratedColumn()
   id: string;
 
-  @Column({ name: 'employee_id' })
+  @Column()
   employeeId: string;
 
-  @ManyToOne(() => Employee, { eager: true })
+  @ManyToOne(() => Employee)
+  @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
   @Column({
     type: 'enum',
-    enum: AuditAction,
-    name: 'action'
+    enum: AuditAction
   })
   action: AuditAction;
 
-  @Column('jsonb', { name: 'metadata', nullable: true })
+  @Column('jsonb', { nullable: true })
   metadata: any;
 
-  @Column({ name: 'ip_address', nullable: true })
+  @Column({ nullable: true })
   ip_address: string;
 
-  @Column({ name: 'user_agent', nullable: true })
+  @Column({ nullable: true })
   user_agent: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   created_at: Date;
 
   @ManyToOne(() => TimeEntry, timeEntry => timeEntry.auditLogs, { nullable: true })

@@ -1,20 +1,21 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Employee } from './Employee';
 
 @Entity('password_history')
 export class PasswordHistory {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
+  @PrimaryGeneratedColumn()
   id: string;
 
-  @Column({ name: 'password_hash' })
+  @Column()
   password_hash: string;
 
-  @Column({ name: 'employee_id' })
+  @Column()
   employeeId: string;
 
-  @ManyToOne(() => Employee, employee => employee.passwordHistory, { eager: true })
+  @ManyToOne(() => Employee, employee => employee.passwordHistory)
+  @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   created_at: Date;
 } 
