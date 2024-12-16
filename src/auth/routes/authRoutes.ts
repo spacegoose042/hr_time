@@ -69,7 +69,7 @@ router.post(
   '/forgot-password',
   resetLimiter,
   validateRequest(forgotPasswordSchema),
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email } = req.body;
       const employeeRepo = AppDataSource.getRepository(Employee);
@@ -79,10 +79,11 @@ router.post(
 
       // Don't reveal if user exists or not
       if (!employee) {
-        return res.json({ 
+        res.json({ 
           status: 'success',
           message: 'If an account exists with this email, you will receive password reset instructions.'
         });
+        return;
       }
 
       // Generate reset token
@@ -101,12 +102,12 @@ router.post(
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
       await sendPasswordResetEmail(employee.email, resetUrl);
 
-      return res.json({
+      res.json({
         status: 'success',
         message: 'Password reset instructions sent to your email'
       });
     } catch (error) {
-      return next(error);
+      next(error);
     }
   }
 );

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { validateRequest } from '../middleware/validateRequest';
 import { z } from 'zod';
@@ -170,7 +170,7 @@ const validateTimeEntry = async (
 router.post('/clock-in',
   requireAuth,
   validateRequest(clockInSchema),
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       console.log('Clock in request from user:', req.user);
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
@@ -201,7 +201,10 @@ router.post('/clock-in',
       const savedEntry = await timeEntryRepo.save(timeEntry);
       console.log('Time entry saved:', savedEntry);
 
-      res.status(201).json(savedEntry);
+      res.json({
+        status: 'success',
+        data: savedEntry
+      });
     } catch (error) {
       console.error('Error in clock-in endpoint:', error);
       next(error);
@@ -511,7 +514,7 @@ router.post('/test-weekly-report',
 // Add this near your other routes
 router.get('/current',
   requireAuth,
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
