@@ -33,7 +33,7 @@ import {
   Archive as ArchiveIcon
 } from '@mui/icons-material';
 import TimeHistoryAdvancedFilters from './TimeHistoryAdvancedFilters';
-import { exportToCSV, exportTimeEntries } from '../services/exportService';
+import { exportToCSV, exportTimeEntries, ExportFormat } from '../services/exportService';
 
 export interface TimeEntry {
   id: string;
@@ -475,6 +475,14 @@ export default function TimeHistory({
   const availableProjects = ['Project A', 'Project B', 'Project C'];
   const availableTasks = ['Task 1', 'Task 2', 'Task 3'];
 
+  const handleExport = (format: ExportFormat = 'csv') => {
+    if (format === 'csv') {
+      exportToCSV(entries);
+    } else {
+      exportTimeEntries(entries, { format });
+    }
+  };
+
   return (
     <Box sx={{ height: 600, width: '100%' }}>
       <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
@@ -504,7 +512,7 @@ export default function TimeHistory({
           {/* Export Button */}
           <Button
             startIcon={<DownloadIcon />}
-            onClick={() => exportToCSV(entries)}
+            onClick={() => handleExport('csv')}
             variant="outlined"
             size="small"
           >

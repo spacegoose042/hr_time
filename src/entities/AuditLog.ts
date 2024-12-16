@@ -9,7 +9,12 @@ export enum AuditAction {
   APPROVE = 'approve',
   REJECT = 'reject',
   FORCE_CLOSE = 'force_close',
-  OVERRIDE_VALIDATION = 'override_validation'
+  OVERRIDE_VALIDATION = 'override_validation',
+  PASSWORD_RESET = 'password_reset',
+  PASSWORD_CHANGE = 'password_change',
+  FAILED_PASSWORD_ATTEMPT = 'failed_password_attempt',
+  ACCOUNT_LOCKED = 'account_locked',
+  ACCOUNT_UNLOCKED = 'account_unlocked'
 }
 
 @Entity('audit_logs')

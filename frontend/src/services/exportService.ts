@@ -11,6 +11,19 @@ declare module 'jspdf' {
   }
 }
 
+export type ExportFormat = 'xlsx' | 'csv' | 'pdf' | 'json';
+
+export interface ExportRow {
+  'Clock In': string;
+  'Clock Out': string;
+  'Duration': string;
+  'Break': string;
+  'Status': string;
+  'Project': string;
+  'Task': string;
+  'Notes': string;
+}
+
 export interface ExportOptions {
   format: ExportFormat;
   columns?: string[];
@@ -20,19 +33,6 @@ export interface ExportOptions {
   sortBy?: keyof TimeEntry;
   sortOrder?: 'asc' | 'desc';
   customFileName?: string;
-}
-
-export type ExportFormat = 'xlsx' | 'csv' | 'pdf' | 'json';
-
-interface ExportRow {
-  'Clock In': string;
-  'Clock Out': string;
-  'Duration': string;
-  'Break': string;
-  'Status': string;
-  'Project': string;
-  'Task': string;
-  'Notes': string;
 }
 
 export const exportTimeEntries = (entries: TimeEntry[], options: ExportOptions) => {
