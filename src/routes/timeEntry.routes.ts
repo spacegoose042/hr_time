@@ -17,7 +17,39 @@ const router = Router();
 
 router.get('/entries', wrapAsync(async (req: AuthenticatedRequest, res: Response) => {
   const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
-  // ... rest of the handler
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(50, Number(req.query.limit) || 10));
+  const offset = (page - 1) * limit;
+
+  const queryBuilder = timeEntryRepo.createQueryBuilder('time_entry')
+    .where('time_entry.employee_id = :employeeId', { employeeId: req.user.id })
+    .skip(offset)
+    .take(limit);
+
+  // Handle project filter
+  if (typeof req.query.projects === 'string') {
+    const projects = req.query.projects.split(',');
+    if (projects.length) {
+      queryBuilder.andWhere('time_entry.project IN (:...projects)', { projects });
+    }
+  }
+
+  // Handle task filter
+  if (typeof req.query.tasks === 'string') {
+    const tasks = req.query.tasks.split(',');
+    if (tasks.length) {
+      queryBuilder.andWhere('time_entry.task IN (:...tasks)', { tasks });
+    }
+  }
+
+  const [entries, total] = await queryBuilder.getManyAndCount();
+
+  res.json({
+    entries,
+    total,
+    page,
+    limit
+  });
 }));
 
 router.post('/bulk-action', wrapAsync(async (req: AuthenticatedRequest, res: Response) => {
@@ -36,7 +68,29 @@ router.post('/bulk-action', wrapAsync(async (req: AuthenticatedRequest, res: Res
     throw new ApiError('Unauthorized - Manager access required', 403);
   }
 
-  // ... rest of the handler
+  const entries = await timeEntryRepo.find({
+    where: { id: In(entryIds) },
+    relations: ['employee']
+  });
+
+  if (entries.length !== entryIds.length) {
+    throw new ApiError('One or more entries not found', 400);
+  }
+
+  // Create audit logs for each action
+  const auditPromises = entries.map(entry => 
+    createAuditLog(
+      manager,
+      entry,
+      action === 'delete' ? AuditAction.DELETE : AuditAction[action.toUpperCase() as keyof typeof AuditAction],
+      { before: entry },
+      notes || `Bulk ${action} action`,
+      req
+    )
+  );
+
+  await Promise.all(auditPromises);
+  res.json({ status: 'success', count: entries.length });
 }));
 
 export default router; 
