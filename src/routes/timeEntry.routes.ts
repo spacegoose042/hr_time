@@ -572,7 +572,7 @@ router.patch(
   '/current',
   requireAuth,
   validateRequest(updateCurrentSchema),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
       const employee = req.user as Employee;
@@ -655,10 +655,12 @@ router.patch(
           breakMinutes: updatedEntry.break_minutes || 0
         }
       });
+      return;
     } catch (error) {
       next(error);
+      return;
     }
-  }
+  }) as RequestHandler
 );
 
 router.post('/force-close',
@@ -784,7 +786,7 @@ router.get(
   '/audit-logs',
   requireAuth,
   requireRole(UserRole.MANAGER),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const auditRepo = AppDataSource.getRepository(AuditLog);
       const { timeEntryId } = req.query;
@@ -804,10 +806,12 @@ router.get(
         status: 'success',
         data: logs
       });
+      return;
     } catch (error) {
       next(error);
+      return;
     }
-  }
+  }) as RequestHandler
 );
 
 export default router; 
