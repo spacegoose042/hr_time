@@ -17,11 +17,17 @@ export const createAuditLog = async ({
     actor,
     target,
     action,
-    metadata = {},
+    metadata: inputMetadata = {},
     notes = '',
     req
 }: CreateAuditLogParams): Promise<AuditLog> => {
     const auditLogRepo = AppDataSource.getRepository(AuditLog);
+
+    const metadata: AuditMetadata = {
+        ip: req?.ip || 'unknown',
+        userAgent: req?.headers['user-agent']?.toString() || 'unknown',
+        ...inputMetadata
+    };
 
     const targetType: AuditTargetType = target instanceof TimeEntry ? 'time_entry' : 'employee';
     const targetId = target?.id || 'system';
@@ -31,11 +37,7 @@ export const createAuditLog = async ({
         action,
         target_type: targetType,
         target_id: targetId,
-        metadata: {
-            ...metadata,
-            ip: req?.ip || 'unknown',
-            userAgent: req?.headers['user-agent'] || 'unknown'
-        },
+        metadata,
         notes
     });
 

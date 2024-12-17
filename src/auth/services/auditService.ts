@@ -63,4 +63,38 @@ export class AuthAuditService {
 
     return attempts;
   }
+
+  static async getLogs(options: GetLogsOptions): Promise<AuditLog[]> {
+    const auditRepo = AppDataSource.getRepository(AuditLog);
+    const queryBuilder = auditRepo.createQueryBuilder('audit_log')
+      .leftJoinAndSelect('audit_log.actor', 'actor')
+      .orderBy('audit_log.created_at', 'DESC');
+    
+    if (options.startDate) {
+      queryBuilder.andWhere('audit_log.created_at >= :startDate', { 
+        startDate: options.startDate 
+      });
+    }
+    
+    if (options.endDate) {
+      queryBuilder.andWhere('audit_log.created_at <= :endDate', { 
+        endDate: options.endDate 
+      });
+    }
+    
+    if (options.action) {
+      queryBuilder.andWhere('audit_log.action = :action', { 
+        action: options.action 
+      });
+    }
+
+    if (options.searchTerm) {
+      queryBuilder.andWhere(
+        '(actor.first_name ILIKE :search OR actor.last_name ILIKE :search OR audit_log.notes ILIKE :search)',
+        { search: `%${options.searchTerm}%` }
+      );
+    }
+
+    return await queryBuilder.getMany();
+  }
 } 

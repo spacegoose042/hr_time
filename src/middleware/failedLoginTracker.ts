@@ -19,6 +19,8 @@ export const trackFailedLogins = async (
       target: employee,
       action: AuditAction.FAILED_LOGIN,
       metadata: {
+        ip: req.ip || 'unknown',
+        userAgent: req.headers['user-agent']?.toString() || 'unknown',
         attempt: (employee.login_attempts || 0) + 1,
         reason: 'Invalid password'
       },

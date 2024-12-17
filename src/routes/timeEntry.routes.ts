@@ -130,7 +130,9 @@ const bulkActionHandler: RequestHandler = async (req: Request, res: Response, ne
         action: action === 'delete' ? 
           AuditAction.DELETE : 
           AuditAction[action.toUpperCase() as keyof typeof AuditAction],
-        metadata: { 
+        metadata: {
+          ip: req.ip || 'unknown',
+          userAgent: req.headers['user-agent']?.toString() || 'unknown',
           before: entry,
           bulk: true,
           totalEntries: entries.length

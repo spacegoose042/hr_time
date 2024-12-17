@@ -112,8 +112,8 @@ router.get(
           actor_email: log.actor.email,
           target_type: log.target_type,
           target_id: log.target_id,
-          ip: log.metadata.ip,
-          user_agent: log.metadata.userAgent,
+          ip: log.metadata.ip || 'unknown',
+          user_agent: log.metadata.userAgent || 'unknown',
           notes: log.notes
         }));
 

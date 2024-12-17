@@ -9,6 +9,7 @@ export enum AuditAction {
   REJECT = 'reject',
   CLOCK_IN = 'clock_in',
   CLOCK_OUT = 'clock_out',
+  LOGIN = 'login',
   FAILED_LOGIN = 'failed_login',
   SUCCESSFUL_LOGIN = 'successful_login',
   PASSWORD_RESET = 'password_reset',

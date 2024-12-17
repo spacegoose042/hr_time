@@ -13,7 +13,7 @@ export interface FormattedAuditLog {
 }
 
 export interface AuditLogResponse {
-  logs: AuditLog[];
+  logs: FormattedAuditLog[];
   total: number;
   page: number;
   limit: number;
