@@ -13,7 +13,7 @@ declare module 'jspdf' {
 
 export type ExportFormat = 'xlsx' | 'csv' | 'pdf' | 'json';
 
-export interface ExportRow extends TimeEntry {
+export interface ExportRow {
   'Clock In': string;
   'Clock Out': string;
   'Duration': string;
@@ -124,9 +124,8 @@ const getWeekNumber = (date: Date): number => {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 };
 
-const formatEntriesForExport = (entries: TimeEntry[]): TimeEntry[] => {
+const formatEntriesForExport = (entries: TimeEntry[]): ExportRow[] => {
   return entries.map(entry => ({
-    ...entry, // Keep all original TimeEntry properties
     'Clock In': new Date(entry.clock_in).toLocaleString(),
     'Clock Out': entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Not clocked out',
     'Duration': calculateDuration(entry),
@@ -142,17 +141,14 @@ const exportToExcel = (data: ExportRow[], filename: string) => {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Time Entries');
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  saveAs(blob, `${filename}.xlsx`);
+  XLSX.writeFile(workbook, `${filename}.xlsx`);
 };
 
 export const exportToCSV = (data: TimeEntry[], filename?: string) => {
   const formattedData = formatEntriesForExport(data);
   const csv = Papa.unparse(formattedData);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const defaultFilename = `time-entries-${new Date().toISOString().split('T')[0]}.csv`;
-  saveAs(blob, filename || defaultFilename);
+  saveAs(blob, filename || `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
 };
 
 const exportToPDF = (data: ExportRow[], filename: string) => {

@@ -18,6 +18,7 @@ import { AuditService } from '../services/auditService';
 import { AuditAction } from '../../entities/AuditLog';
 import { MoreThanOrEqual } from 'typeorm';
 import { verify } from 'jsonwebtoken';
+import { validateBulkAction, validatePagination } from '../../middleware/validateRequest';
 
 const router = Router();
 const authService = new AuthService();
@@ -29,7 +30,7 @@ router.post('/register',
 );
 
 router.post('/login',
-  validateRequest(loginSchema),
+  validateBulkAction,
   authController.login
 );
 
