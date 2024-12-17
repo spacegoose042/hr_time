@@ -20,6 +20,16 @@ import { DatePicker } from '@mui/x-date-pickers';
 import { FilterList as FilterIcon, Close as ClearIcon } from '@mui/icons-material';
 import { useState } from 'react';
 
+type AutocompleteChangeHandler = (
+  event: React.SyntheticEvent,
+  value: string[]
+) => void;
+
+type SliderChangeHandler = (
+  event: Event | null,
+  value: number | number[]
+) => void;
+
 interface AdvancedFilters {
   startDate: Date | null;
   endDate: Date | null;
@@ -51,20 +61,6 @@ const DATE_RANGE_OPTIONS = [
   { label: 'This Month', value: 'month' },
   { label: 'Custom Range', value: 'custom' }
 ] as const;
-
-type AutocompleteChangeHandler = (
-  event: React.SyntheticEvent,
-  value: string[]
-) => void;
-
-type SliderChangeHandler = (
-  event: Event | null,
-  value: number | number[]
-) => void;
-
-type SwitchChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
-
-type FilterChangeHandler<T> = (value: T) => void;
 
 export default function TimeHistoryAdvancedFilters({
   filters,

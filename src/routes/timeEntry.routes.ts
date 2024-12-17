@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { Repository, In } from 'typeorm';
 import { Employee } from '../entities/Employee';
 import { ApiError } from '../middleware/errorHandler';
@@ -7,15 +7,32 @@ import AppDataSource from '../db/connection';
 import { TimeEntry } from '../entities/TimeEntry';
 import { AuditAction } from '../entities/AuditLog';
 import { UserRole } from '../auth/roles/roles';
-import { wrapAsync } from '../utils/asyncHandler';
 
+// Update interface to extend Express.Request
 interface AuthenticatedRequest extends Request {
-  user: Employee;
+  user: Employee & { id: string; role: UserRole };
+}
+
+// Add type for bulk action request
+interface BulkActionRequest {
+  action: 'approve' | 'reject' | 'delete';
+  entryIds: string[];
+  notes?: string;
 }
 
 const router = Router();
 
-router.get('/entries', wrapAsync(async (req: AuthenticatedRequest, res: Response) => {
+// Add middleware to verify authentication
+const verifyAuth = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    throw new ApiError('Unauthorized', 401);
+  }
+  next();
+};
+
+router.use(verifyAuth);
+
+router.get('/entries', async (req: AuthenticatedRequest, res: Response) => {
   const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.max(1, Math.min(50, Number(req.query.limit) || 10));
@@ -50,9 +67,9 @@ router.get('/entries', wrapAsync(async (req: AuthenticatedRequest, res: Response
     page,
     limit
   });
-}));
+});
 
-router.post('/bulk-action', wrapAsync(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/bulk-action', async (req: AuthenticatedRequest & { body: BulkActionRequest }, res: Response) => {
   const { action, entryIds, notes } = req.body;
   const timeEntryRepo = AppDataSource.getRepository(TimeEntry);
   const employeeRepo = AppDataSource.getRepository(Employee);
@@ -91,6 +108,6 @@ router.post('/bulk-action', wrapAsync(async (req: AuthenticatedRequest, res: Res
 
   await Promise.all(auditPromises);
   res.json({ status: 'success', count: entries.length });
-}));
+});
 
 export default router; 

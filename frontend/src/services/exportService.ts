@@ -13,7 +13,7 @@ declare module 'jspdf' {
 
 export type ExportFormat = 'xlsx' | 'csv' | 'pdf' | 'json';
 
-export interface ExportRow {
+export interface ExportRow extends TimeEntry {
   'Clock In': string;
   'Clock Out': string;
   'Duration': string;
@@ -124,8 +124,9 @@ const getWeekNumber = (date: Date): number => {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 };
 
-const formatEntriesForExport = (entries: TimeEntry[]): ExportRow[] => {
+const formatEntriesForExport = (entries: TimeEntry[]): TimeEntry[] => {
   return entries.map(entry => ({
+    ...entry, // Keep all original TimeEntry properties
     'Clock In': new Date(entry.clock_in).toLocaleString(),
     'Clock Out': entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Not clocked out',
     'Duration': calculateDuration(entry),

@@ -33,7 +33,7 @@ import {
   Archive as ArchiveIcon
 } from '@mui/icons-material';
 import TimeHistoryAdvancedFilters from './TimeHistoryAdvancedFilters';
-import { exportToCSV, exportTimeEntries, ExportFormat } from '../services/exportService';
+import { exportToCSV, exportTimeEntries } from '../services/exportService';
 
 export interface TimeEntry {
   id: string;
