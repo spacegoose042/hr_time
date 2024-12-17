@@ -3,7 +3,7 @@ import { Employee } from '../entities/Employee';
 import { createAuditLog } from '../services/auditService';
 import { AuthAuditService } from '../auth/services/auditService';
 import AppDataSource from '../db/connection';
-import { UserRole } from '../entities/Employee';
+import { UserRole } from '../auth/roles/roles';
 
 describe('Audit System', () => {
   let testEmployee: Employee;
