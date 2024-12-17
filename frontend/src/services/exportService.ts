@@ -1,9 +1,9 @@
 import { TimeEntry } from '../components/TimeHistory';
 import { saveAs } from 'file-saver';
-import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import Papa from 'papaparse';
+import ExcelJS from 'exceljs';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -137,27 +137,37 @@ const formatEntriesForExport = (entries: TimeEntry[]): ExportRow[] => {
   }));
 };
 
-const exportToExcel = (data: TimeEntry[], filename: string) => {
-  const formattedData = formatEntriesForExport(data);
-  const worksheet = XLSX.utils.json_to_sheet(formattedData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Time Entries');
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
+const exportToExcel = async (data: ExportRow[], filename: string) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Time Entries');
+  
+  // Add headers
+  worksheet.columns = Object.keys(data[0]).map(key => ({
+    header: key,
+    key,
+    width: 20
+  }));
+  
+  // Add rows
+  worksheet.addRows(data);
+  
+  // Generate buffer
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, `${filename}.xlsx`);
 };
 
-export const exportToCSV = (data: TimeEntry[], filename?: string) => {
-  const formattedData = formatEntriesForExport(data);
-  const csv = Papa.unparse(formattedData);
+export const exportToCSV = (data: ExportRow[], filename?: string) => {
+  const csv = Papa.unparse(data);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   saveAs(blob, filename || `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
 };
 
-const exportToPDF = (data: TimeEntry[], filename: string) => {
-  const formattedData = formatEntriesForExport(data);
+const exportToPDF = (data: ExportRow[], filename: string) => {
   const doc = new jsPDF();
   doc.autoTable({
-    head: [Object.keys(formattedData[0])],
-    body: formattedData.map(Object.values),
+    head: [Object.keys(data[0])],
+    body: data.map(Object.values),
     styles: { fontSize: 8 },
     headStyles: { fillColor: [66, 66, 66] }
   });

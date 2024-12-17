@@ -1,6 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn } from 'typeorm';
 import { Employee } from './Employee';
-import { TimeEntry } from './TimeEntry';
 
 export enum AuditAction {
   CREATE = 'create',
@@ -8,26 +7,22 @@ export enum AuditAction {
   DELETE = 'delete',
   APPROVE = 'approve',
   REJECT = 'reject',
-  FORCE_CLOSE = 'force_close',
-  OVERRIDE_VALIDATION = 'override_validation',
+  CLOCK_IN = 'clock_in',
+  CLOCK_OUT = 'clock_out',
+  FAILED_LOGIN = 'failed_login',
+  SUCCESSFUL_LOGIN = 'successful_login',
   PASSWORD_RESET = 'password_reset',
-  PASSWORD_CHANGE = 'password_change',
-  FAILED_PASSWORD_ATTEMPT = 'failed_password_attempt',
-  ACCOUNT_LOCKED = 'account_locked',
-  ACCOUNT_UNLOCKED = 'account_unlocked'
+  FAILED_PASSWORD_ATTEMPT = 'failed_password_attempt'
 }
 
-@Entity('audit_logs')
+@Entity()
 export class AuditLog {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  employeeId: string;
-
   @ManyToOne(() => Employee)
-  @JoinColumn({ name: 'employee_id' })
-  employee: Employee;
+  @JoinColumn({ name: 'actor_id' })
+  actor: Employee;
 
   @Column({
     type: 'enum',
@@ -35,18 +30,18 @@ export class AuditLog {
   })
   action: AuditAction;
 
-  @Column('jsonb', { nullable: true })
-  metadata: any;
+  @Column()
+  target_type: string;
+
+  @Column()
+  target_id: string;
+
+  @Column('jsonb')
+  metadata: Record<string, any>;
 
   @Column({ nullable: true })
-  ip_address: string;
-
-  @Column({ nullable: true })
-  user_agent: string;
+  notes: string;
 
   @CreateDateColumn()
   created_at: Date;
-
-  @ManyToOne(() => TimeEntry, timeEntry => timeEntry.auditLogs, { nullable: true })
-  timeEntry: TimeEntry;
 } 

@@ -1,56 +1,37 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Employee } from './Employee';
 import { AuditLog } from './AuditLog';
 
-@Entity('time_entries')
+@Entity()
 export class TimeEntry {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  employeeId: string;
-
-  @Column({ type: 'timestamp' })
-  clock_in: Date;
-
-  @Column({ type: 'timestamp', nullable: true })
-  clock_out: Date | null;
-
   @ManyToOne(() => Employee)
-  @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
-  @Column({ type: 'text', nullable: true })
-  notes: string | null;
+  @Column()
+  clock_in: Date;
 
-  @Column({ type: 'int', nullable: true })
-  break_minutes: number | null;
-
-  @Column({ type: 'text', nullable: true })
-  break_notes: string | null;
+  @Column({ nullable: true })
+  clock_out: Date;
 
   @Column({
     type: 'enum',
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   })
-  status: string;
+  status: 'pending' | 'approved' | 'rejected';
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ nullable: true })
+  break_minutes: number;
+
+  @Column({ nullable: true })
+  notes: string;
+
+  @CreateDateColumn()
   created_at: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updated_at: Date;
-
-  @Column({ type: 'text', nullable: true })
-  project: string | null;
-
-  @Column({ type: 'text', nullable: true })
-  task: string | null;
-
-  @OneToMany(() => AuditLog, audit => audit.timeEntry, { cascade: true })
-  auditLogs: AuditLog[];
-
-  @ManyToOne(() => Employee, { nullable: true })
-  approver: Employee | null;
 } 

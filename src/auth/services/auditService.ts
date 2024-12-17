@@ -2,6 +2,7 @@ import { Request } from 'express';
 import AppDataSource from '../../db/connection';
 import { AuditLog, AuditAction } from '../../entities/AuditLog';
 import { In, MoreThanOrEqual } from 'typeorm';
+import { Employee } from '../../entities/Employee';
 
 interface GetLogsOptions {
   startDate?: Date;
@@ -78,6 +79,38 @@ export class AuditService {
       where,
       relations: ['employee'],
       order: { created_at: 'DESC' }
+    });
+  }
+
+  static async getPasswordHistory(employeeId: string): Promise<AuditLog[]> {
+    const auditLogRepo = AppDataSource.getRepository(AuditLog);
+    
+    return await auditLogRepo.find({
+      where: {
+        target_type: 'employee',
+        target_id: employeeId,
+        action: In([AuditAction.PASSWORD_RESET])
+      },
+      order: {
+        created_at: 'DESC'
+      },
+      take: 5
+    });
+  }
+
+  static async getLoginHistory(employeeId: string): Promise<AuditLog[]> {
+    const auditLogRepo = AppDataSource.getRepository(AuditLog);
+    
+    return await auditLogRepo.find({
+      where: {
+        target_type: 'employee',
+        target_id: employeeId,
+        action: In([AuditAction.SUCCESSFUL_LOGIN, AuditAction.FAILED_LOGIN])
+      },
+      order: {
+        created_at: 'DESC'
+      },
+      take: 10
     });
   }
 } 

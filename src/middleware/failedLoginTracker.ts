@@ -1,38 +1,36 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuditService } from '../auth/services/auditService';
-import { AuditAction } from '../entities/AuditLog';
-import { ApiError } from './errorHandler';
-import AppDataSource from '../db/connection';
 import { Employee } from '../entities/Employee';
+import { AuditAction } from '../entities/AuditLog';
+import { createAuditLog } from '../services/auditService';
+import AppDataSource from '../db/connection';
 
 export const trackFailedLogins = async (
+  employee: Employee,
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction
 ) => {
   try {
-    const { email } = req.body;
     const employeeRepo = AppDataSource.getRepository(Employee);
-    const employee = await employeeRepo.findOne({ where: { email } });
+    
+    // Create audit log for failed attempt
+    await createAuditLog(
+      employee,
+      null,
+      AuditAction.FAILED_LOGIN,
+      {
+        attempt: employee.failed_login_attempts + 1,
+        reason: 'Invalid password'
+      },
+      'Failed login attempt',
+      req
+    );
 
-    if (employee) {
-      const failedAttempts = await AuditService.getFailedAttempts(employee.id);
-      
-      if (failedAttempts >= 5) {
-        // Lock account
-        employee.status = 'locked';
-        await employeeRepo.save(employee);
-        
-        await AuditService.log(
-          employee.id,
-          AuditAction.ACCOUNT_LOCKED,
-          { reason: 'Too many failed attempts' },
-          req
-        );
-
-        throw new ApiError('Account locked due to too many failed attempts', 403);
-      }
-    }
+    // Update failed login attempts
+    await employeeRepo.update(employee.id, {
+      failed_login_attempts: () => 'failed_login_attempts + 1',
+      last_failed_login: new Date()
+    });
 
     next();
   } catch (error) {

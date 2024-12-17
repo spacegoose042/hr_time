@@ -33,7 +33,7 @@ import {
   Archive as ArchiveIcon
 } from '@mui/icons-material';
 import TimeHistoryAdvancedFilters from './TimeHistoryAdvancedFilters';
-import { exportToCSV, exportTimeEntries } from '../services/exportService';
+import { exportToCSV, exportTimeEntries, ExportFormat } from '../services/exportService';
 
 export interface TimeEntry {
   id: string;
@@ -398,23 +398,17 @@ interface TimeHistoryProps {
   todayTotal: string;
   weekTotal: string;
   totalCount: number;
-  paginationModel: GridPaginationModel;
   isLoading: boolean;
+  error: string | null;
+  page: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
   onPaginationModelChange: (model: GridPaginationModel) => void;
   filters: TimeHistoryFilters;
-  onFilterChange: (filters: Partial<TimeHistoryProps['filters']>) => void;
+  onFilterChange: (filters: Partial<TimeHistoryFilters>) => void;
   onClearFilters: () => void;
-  onEditEntry?: (entry: TimeEntry) => void;
-  onApproveEntry?: (entry: TimeEntry) => void;
-  onRejectEntry?: (entry: TimeEntry) => void;
   userRole?: 'employee' | 'manager' | 'admin';
-  onBulkApprove?: (entries: TimeEntry[]) => void;
-  onBulkReject?: (entries: TimeEntry[]) => void;
-  onBulkDelete?: (entries: TimeEntry[]) => void;
-  onBulkSubmit?: (entries: TimeEntry[]) => void;
-  onBulkPrint?: (entries: TimeEntry[]) => void;
-  onBulkEmail?: (entries: TimeEntry[]) => void;
-  onBulkArchive?: (entries: TimeEntry[]) => void;
 }
 
 export default function TimeHistory({
@@ -422,25 +416,19 @@ export default function TimeHistory({
   todayTotal,
   weekTotal,
   totalCount,
-  paginationModel,
   isLoading,
+  error,
+  page,
+  limit,
+  onPageChange,
+  onLimitChange,
   onPaginationModelChange,
   filters,
   onFilterChange,
   onClearFilters,
-  onEditEntry,
-  onApproveEntry,
-  onRejectEntry,
-  userRole,
-  onBulkApprove,
-  onBulkReject,
-  onBulkDelete,
-  onBulkSubmit,
-  onBulkPrint,
-  onBulkEmail,
-  onBulkArchive
+  userRole
 }: TimeHistoryProps) {
-  const columns = createColumns(onEditEntry, onApproveEntry, onRejectEntry, userRole);
+  const columns = createColumns(undefined, undefined, undefined, userRole);
   const [selectedEntries, setSelectedEntries] = useState<TimeEntry[]>([]);
 
   const handleSelectionChange = (
@@ -475,14 +463,45 @@ export default function TimeHistory({
   const availableProjects = ['Project A', 'Project B', 'Project C'];
   const availableTasks = ['Task 1', 'Task 2', 'Task 3'];
 
-  const handleExport = () => {
-    exportToCSV(entries.map(entry => ({
-      ...entry,
-      clock_out: entry.clock_out || '',
-      notes: entry.notes || '',
-      project: entry.project || '',
-      task: entry.task || ''
-    })));
+  const handleExport = (format: ExportFormat) => {
+    const formattedEntries = entries.map(entry => ({
+      'Clock In': new Date(entry.clock_in).toLocaleString(),
+      'Clock Out': entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Not clocked out',
+      'Duration': calculateDuration(entry),
+      'Break': entry.break_minutes ? `${entry.break_minutes} min` : 'No break',
+      'Status': entry.status.charAt(0).toUpperCase() + entry.status.slice(1),
+      'Project': entry.project || '',
+      'Task': entry.task || '',
+      'Notes': entry.notes || ''
+    }));
+
+    switch (format) {
+      case 'csv':
+        exportToCSV(formattedEntries);
+        break;
+      case 'xlsx':
+        exportTimeEntries(entries, { format: 'xlsx' });
+        break;
+      case 'pdf':
+        exportTimeEntries(entries, { format: 'pdf' });
+        break;
+      default:
+        console.error('Unsupported format');
+    }
+  };
+
+  const calculateDuration = (entry: TimeEntry): string => {
+    if (!entry.clock_out) return 'In progress';
+    const start = new Date(entry.clock_in);
+    const end = new Date(entry.clock_out);
+    const diffMs = end.getTime() - start.getTime() - ((entry.break_minutes || 0) * 60 * 1000);
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
+  const handleExportClick = (event: React.MouseEvent) => {
+    handleExport('csv'); // or whatever default format you want
   };
 
   return (
@@ -514,7 +533,7 @@ export default function TimeHistory({
           {/* Export Button */}
           <Button
             startIcon={<DownloadIcon />}
-            onClick={handleExport}
+            onClick={handleExportClick}
             variant="outlined"
             size="small"
           >
@@ -543,8 +562,10 @@ export default function TimeHistory({
           columns={columns}
           loading={isLoading}
           pageSizeOptions={[5, 10, 25, 50]}
-          paginationModel={paginationModel}
-          onPaginationModelChange={onPaginationModelChange}
+          page={page - 1}
+          pageSize={limit}
+          onPageChange={(newPage) => onPageChange(newPage + 1)}
+          onPageSizeChange={onLimitChange}
           rowCount={totalCount}
           paginationMode="server"
           autoHeight

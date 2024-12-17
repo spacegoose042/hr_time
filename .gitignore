@@ -1,23 +1,15 @@
 # Dependencies
 node_modules/
+.cache/
+
+# Build output
 dist/
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Logs
-logs
-*.log
-npm-debug.log*
+build/
 
 # IDE
-.idea/
 .vscode/
-*.swp
-*.swo
+.idea/
 
-# OS
+# Misc
 .DS_Store
-Thumbs.db 
+*.log

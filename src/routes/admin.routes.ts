@@ -104,13 +104,28 @@ router.get(
           ]
         });
 
-        const records = logs.map((log: AuditLog) => ({
-          created_at: dateFormat(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
+        const formattedLogs = logs.map(log => ({
+          timestamp: log.created_at,
           action: log.action,
-          employee_name: `${log.employee.first_name} ${log.employee.last_name}`,
-          employee_email: log.employee.email,
-          ip_address: log.ip_address,
-          metadata: JSON.stringify(log.metadata)
+          actor_name: `${log.actor.first_name} ${log.actor.last_name}`,
+          actor_email: log.actor.email,
+          target_type: log.target_type,
+          target_id: log.target_id,
+          ip: log.metadata.ip,
+          user_agent: log.metadata.userAgent,
+          notes: log.notes
+        }));
+
+        const records = formattedLogs.map((log: any) => ({
+          created_at: dateFormat(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss'),
+          action: log.action,
+          employee_name: `${log.actor_name}`,
+          employee_email: log.actor_email,
+          ip_address: log.ip,
+          metadata: JSON.stringify({
+            user_agent: log.user_agent,
+            notes: log.notes
+          })
         }));
 
         const csvString = csvStringifier.getHeaderString() + csvStringifier.stringifyRecords(records);
