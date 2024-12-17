@@ -1,13 +1,4 @@
-import { 
-  Box, 
-  TextField, 
-  MenuItem, 
-  Stack,
-  IconButton,
-  Tooltip
-} from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers';
-import ClearIcon from '@mui/icons-material/Clear';
+import { TimeHistoryFilters } from '../types/timeEntry';
 
 interface TimeHistoryFiltersProps {
   filters: TimeHistoryFilters;

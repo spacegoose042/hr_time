@@ -434,6 +434,69 @@ const TimeClock: React.FC = () => {
     }
   };
 
+  const handleBulkApprove = async (ids: string[]) => {
+    try {
+      await timeEntryService.bulkApprove(ids);
+      await fetchTimeHistory();
+    } catch (error) {
+      console.error('Failed to bulk approve:', error);
+      setError({ status: 'error', message: 'Failed to approve entries' });
+    }
+  };
+
+  const handleBulkReject = async (ids: string[]) => {
+    try {
+      await timeEntryService.bulkReject(ids);
+      await fetchTimeHistory();
+    } catch (error) {
+      console.error('Failed to bulk reject:', error);
+      setError({ status: 'error', message: 'Failed to reject entries' });
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    try {
+      await timeEntryService.bulkDelete(ids);
+      await fetchTimeHistory();
+    } catch (error) {
+      console.error('Failed to bulk delete:', error);
+      setError({ status: 'error', message: 'Failed to delete entries' });
+    }
+  };
+
+  const handleBulkSubmit = async (ids: string[]) => {
+    try {
+      await timeEntryService.bulkSubmit(ids);
+      await fetchTimeHistory();
+    } catch (error) {
+      console.error('Failed to bulk submit:', error);
+      setError({ status: 'error', message: 'Failed to submit entries' });
+    }
+  };
+
+  const handleBulkPrint = (ids: string[]) => {
+    timeEntryService.printEntries(ids);
+  };
+
+  const handleBulkEmail = async (ids: string[]) => {
+    try {
+      await timeEntryService.emailEntries(ids);
+    } catch (error) {
+      console.error('Failed to email entries:', error);
+      setError({ status: 'error', message: 'Failed to email entries' });
+    }
+  };
+
+  const handleBulkArchive = async (ids: string[]) => {
+    try {
+      await timeEntryService.bulkArchive(ids);
+      await fetchTimeHistory();
+    } catch (error) {
+      console.error('Failed to archive entries:', error);
+      setError({ status: 'error', message: 'Failed to archive entries' });
+    }
+  };
+
   if (isInitializing) {
     return (
       <Backdrop open={true} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>

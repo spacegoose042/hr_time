@@ -409,7 +409,7 @@ interface TimeHistoryProps {
   onBulkPrint: (ids: string[]) => void;
   onBulkEmail: (ids: string[]) => void;
   onBulkArchive: (ids: string[]) => void;
-  userRole: string;
+  userRole: 'manager' | 'employee' | 'admin';
   paginationModel: GridPaginationModel;
 }
 
@@ -445,14 +445,14 @@ export default function TimeHistory({
   };
 
   const bulkActions = [
-    { icon: <ApproveIcon />, name: 'Approve', action: () => onBulkApprove?.(selectedEntries) },
-    { icon: <RejectIcon />, name: 'Reject', action: () => onBulkReject?.(selectedEntries) },
-    { icon: <DeleteIcon />, name: 'Delete', action: () => onBulkDelete?.(selectedEntries) },
+    { icon: <ApproveIcon />, name: 'Approve', action: () => onBulkApprove(selectedEntries.map(id => id.toString())) },
+    { icon: <RejectIcon />, name: 'Reject', action: () => onBulkReject(selectedEntries.map(id => id.toString())) },
+    { icon: <DeleteIcon />, name: 'Delete', action: () => onBulkDelete(selectedEntries.map(id => id.toString())) },
     { icon: <ExportIcon />, name: 'Export', action: () => exportTimeEntries(selectedEntries, { format: 'xlsx' }) },
-    { icon: <SubmitIcon />, name: 'Submit', action: () => onBulkSubmit?.(selectedEntries) },
-    { icon: <PrintIcon />, name: 'Print', action: () => onBulkPrint?.(selectedEntries) },
-    { icon: <EmailIcon />, name: 'Email', action: () => onBulkEmail?.(selectedEntries) },
-    { icon: <ArchiveIcon />, name: 'Archive', action: () => onBulkArchive?.(selectedEntries) }
+    { icon: <SubmitIcon />, name: 'Submit', action: () => onBulkSubmit(selectedEntries.map(id => id.toString())) },
+    { icon: <PrintIcon />, name: 'Print', action: () => onBulkPrint(selectedEntries.map(id => id.toString())) },
+    { icon: <EmailIcon />, name: 'Email', action: () => onBulkEmail(selectedEntries.map(id => id.toString())) },
+    { icon: <ArchiveIcon />, name: 'Archive', action: () => onBulkArchive(selectedEntries.map(id => id.toString())) }
   ];
 
   const CustomToolbar = () => (
