@@ -124,14 +124,20 @@ const bulkActionHandler: RequestHandler = async (req: Request, res: Response, ne
 
     // Create audit logs for each action
     const auditPromises = entries.map(entry => 
-      createAuditLog(
-        manager,
-        entry,
-        action === 'delete' ? AuditAction.DELETE : AuditAction[action.toUpperCase() as keyof typeof AuditAction],
-        { before: entry },
-        notes || `Bulk ${action} action`,
+      createAuditLog({
+        actor: manager,
+        target: entry,
+        action: action === 'delete' ? 
+          AuditAction.DELETE : 
+          AuditAction[action.toUpperCase() as keyof typeof AuditAction],
+        metadata: { 
+          before: entry,
+          bulk: true,
+          totalEntries: entries.length
+        },
+        notes: notes || `Bulk ${action} action`,
         req
-      )
+      })
     );
 
     await Promise.all(auditPromises);

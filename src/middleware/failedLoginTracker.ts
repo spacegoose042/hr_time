@@ -14,22 +14,22 @@ export const trackFailedLogins = async (
     const employeeRepo = AppDataSource.getRepository(Employee);
     
     // Create audit log for failed attempt
-    await createAuditLog(
-      employee,
-      null,
-      AuditAction.FAILED_LOGIN,
-      {
-        attempt: employee.failed_login_attempts + 1,
+    await createAuditLog({
+      actor: employee,
+      target: employee,
+      action: AuditAction.FAILED_LOGIN,
+      metadata: {
+        attempt: (employee.login_attempts || 0) + 1,
         reason: 'Invalid password'
       },
-      'Failed login attempt',
+      notes: 'Failed login attempt',
       req
-    );
+    });
 
-    // Update failed login attempts
+    // Update login attempts
     await employeeRepo.update(employee.id, {
-      failed_login_attempts: () => 'failed_login_attempts + 1',
-      last_failed_login: new Date()
+      login_attempts: () => 'COALESCE(login_attempts, 0) + 1',
+      last_login_attempt: new Date()
     });
 
     next();

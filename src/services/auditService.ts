@@ -1,63 +1,45 @@
 import { Request } from 'express';
 import { Employee } from '../entities/Employee';
 import { TimeEntry } from '../entities/TimeEntry';
-import { AuditLog, AuditAction } from '../entities/AuditLog';
+import { AuditLog, AuditAction, AuditMetadata, AuditTargetType } from '../entities/AuditLog';
 import AppDataSource from '../db/connection';
 
-interface AuditMetadata {
-  before?: any;
-  after?: any;
-  ip?: string;
-  userAgent?: string;
+interface CreateAuditLogParams {
+    actor: Employee;
+    target: TimeEntry | Employee | null;
+    action: AuditAction;
+    metadata?: AuditMetadata;
+    notes?: string;
+    req?: Request;
 }
 
-export const createAuditLog = async (
-  actor: Employee,
-  target: TimeEntry,
-  action: AuditAction,
-  metadata: AuditMetadata = {},
-  notes?: string,
-  req?: Request
-) => {
-  try {
+export const createAuditLog = async ({
+    actor,
+    target,
+    action,
+    metadata = {},
+    notes = '',
+    req
+}: CreateAuditLogParams): Promise<AuditLog> => {
     const auditLogRepo = AppDataSource.getRepository(AuditLog);
 
-    // Extract IP and user agent from request if available
-    const ip = req?.ip || metadata.ip || 'unknown';
-    const userAgent = req?.headers['user-agent'] || metadata.userAgent || 'unknown';
+    const targetType: AuditTargetType = target instanceof TimeEntry ? 'time_entry' : 'employee';
+    const targetId = target?.id || 'system';
 
-    // Create the audit log entry
     const auditLog = auditLogRepo.create({
-      actor: actor,
-      action: action,
-      target_type: 'time_entry',
-      target_id: target.id,
-      metadata: {
-        ...metadata,
-        ip,
-        userAgent
-      },
-      notes: notes || ''
+        actor,
+        action,
+        target_type: targetType,
+        target_id: targetId,
+        metadata: {
+            ...metadata,
+            ip: req?.ip || 'unknown',
+            userAgent: req?.headers['user-agent'] || 'unknown'
+        },
+        notes
     });
 
-    // Save the audit log
-    const savedLog = await auditLogRepo.save(auditLog);
-
-    // Fetch the complete log with relations
-    const completeLog = await auditLogRepo.findOne({
-      where: { id: savedLog.id },
-      relations: ['actor']
-    });
-
-    if (!completeLog) {
-      throw new Error('Failed to create audit log');
-    }
-
-    return completeLog;
-  } catch (error) {
-    console.error('Error creating audit log:', error);
-    throw error;
-  }
+    return await auditLogRepo.save(auditLog);
 };
 
 export const getAuditLogs = async (

@@ -15,6 +15,18 @@ export enum AuditAction {
   FAILED_PASSWORD_ATTEMPT = 'failed_password_attempt'
 }
 
+export type AuditMetadata = {
+  ip?: string;
+  userAgent?: string;
+  before?: any;
+  after?: any;
+  reason?: string;
+  attempt?: number;
+  [key: string]: any;
+};
+
+export type AuditTargetType = 'time_entry' | 'employee';
+
 @Entity()
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
@@ -30,14 +42,16 @@ export class AuditLog {
   })
   action: AuditAction;
 
-  @Column()
-  target_type: string;
+  @Column({
+    type: 'varchar'
+  })
+  target_type: AuditTargetType;
 
   @Column()
   target_id: string;
 
   @Column('jsonb')
-  metadata: Record<string, any>;
+  metadata: AuditMetadata;
 
   @Column({ nullable: true })
   notes: string;

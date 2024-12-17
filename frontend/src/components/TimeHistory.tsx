@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import TimeHistoryAdvancedFilters from './TimeHistoryAdvancedFilters';
 import { exportToCSV, exportTimeEntries, ExportFormat } from '../services/exportService';
+import { AuditLog } from '../types/audit';
 
 export interface TimeEntry {
   id: string;
@@ -409,6 +410,7 @@ interface TimeHistoryProps {
   onFilterChange: (filters: Partial<TimeHistoryFilters>) => void;
   onClearFilters: () => void;
   userRole?: 'employee' | 'manager' | 'admin';
+  auditLogs?: AuditLog[];
 }
 
 export default function TimeHistory({
@@ -426,7 +428,8 @@ export default function TimeHistory({
   filters,
   onFilterChange,
   onClearFilters,
-  userRole
+  userRole,
+  auditLogs
 }: TimeHistoryProps) {
   const columns = createColumns(undefined, undefined, undefined, userRole);
   const [selectedEntries, setSelectedEntries] = useState<TimeEntry[]>([]);

@@ -14,7 +14,7 @@ import { sendPasswordResetEmail } from '../services/emailService';
 import rateLimit from 'express-rate-limit';
 import { PasswordValidationService } from '../services/passwordValidationService';
 import { PasswordHistoryService } from '../services/passwordHistoryService';
-import { AuditService } from '../services/auditService';
+import { AuthAuditService } from '../services/auditService';
 import { AuditAction } from '../../entities/AuditLog';
 import { MoreThanOrEqual } from 'typeorm';
 import { verify } from 'jsonwebtoken';
@@ -216,8 +216,8 @@ router.post(
       );
 
       // Log the password reset
-      await AuditService.log(
-        employee.id,
+      await AuthAuditService.log(
+        employee,
         AuditAction.PASSWORD_RESET,
         {
           method: 'reset-token',
@@ -235,8 +235,8 @@ router.post(
     } catch (error) {
       // Log failed attempts
       if (error instanceof ApiError && employee) {
-        await AuditService.log(
-          employee.id,
+        await AuthAuditService.log(
+          employee,
           AuditAction.FAILED_PASSWORD_ATTEMPT,
           {
             method: 'reset-token',

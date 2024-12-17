@@ -6,10 +6,11 @@ import { z } from 'zod';
 import AppDataSource from '../db/connection';
 import { Employee } from '../entities/Employee';
 import { ApiError } from '../middleware/errorHandler';
-import { AuditService } from '../auth/services/auditService';
+import { AuthAuditService } from '../auth/services/auditService';
 import { createObjectCsvStringifier } from 'csv-writer';
 import { format as dateFormat } from 'date-fns';
 import { AuditLog } from '../entities/AuditLog';
+import { FormattedAuditLog, AuditLogResponse } from '../types/audit';
 
 const router = Router();
 
@@ -82,7 +83,7 @@ router.get(
         search?: string;
       };
 
-      const logs = await AuditService.getLogs({
+      const logs = await AuthAuditService.getLogs({
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
         action,
@@ -104,7 +105,7 @@ router.get(
           ]
         });
 
-        const formattedLogs = logs.map(log => ({
+        const formattedLogs = logs.map((log: AuditLog): FormattedAuditLog => ({
           timestamp: log.created_at,
           action: log.action,
           actor_name: `${log.actor.first_name} ${log.actor.last_name}`,
@@ -115,6 +116,13 @@ router.get(
           user_agent: log.metadata.userAgent,
           notes: log.notes
         }));
+
+        const response: AuditLogResponse = {
+          logs: formattedLogs,
+          total: logs.length,
+          page: 1,
+          limit: logs.length
+        };
 
         const records = formattedLogs.map((log: any) => ({
           created_at: dateFormat(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss'),

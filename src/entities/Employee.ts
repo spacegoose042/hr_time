@@ -50,4 +50,13 @@ export class Employee {
 
   @OneToMany(() => PasswordHistory, history => history.employee)
   passwordHistory: PasswordHistory[];
+
+  @Column({ default: 0 })
+  login_attempts: number;
+
+  @Column({ nullable: true })
+  last_login_attempt: Date;
+
+  @Column({ nullable: true })
+  last_successful_login: Date;
 } 
