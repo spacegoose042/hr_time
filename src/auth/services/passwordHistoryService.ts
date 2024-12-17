@@ -1,58 +1,62 @@
+import { Repository } from 'typeorm';
 import { compare } from 'bcryptjs';
-import AppDataSource from '../../db/connection';
 import { PasswordHistory } from '../../entities/PasswordHistory';
-import { MoreThanOrEqual } from 'typeorm';
+import AppDataSource from '../../db/connection';
 
-export class PasswordHistoryService {
-  private static readonly HISTORY_LIMIT = 5; // Number of previous passwords to check
-  private static readonly HISTORY_DAYS = 365; // Don't reuse passwords within a year
+const passwordHistoryRepo: Repository<PasswordHistory> = AppDataSource.getRepository(PasswordHistory);
 
-  static async addToHistory(employeeId: string, passwordHash: string): Promise<void> {
-    const historyRepo = AppDataSource.getRepository(PasswordHistory);
+export const getPasswordHistory = async (employee_id: string): Promise<PasswordHistory[]> => {
+    return await passwordHistoryRepo.find({
+        where: {
+            employee: { id: employee_id }
+        },
+        order: {
+            created_at: 'DESC'
+        },
+        relations: ['employee']
+    });
+};
 
-    // Create new history entry
-    await historyRepo.save({
-      employeeId,
-      password_hash: passwordHash
+export const addPasswordHistory = async (employee_id: string, password_hash: string): Promise<PasswordHistory> => {
+    const newHistory = passwordHistoryRepo.create({
+        employee: { id: employee_id },
+        password_hash
+    });
+    return await passwordHistoryRepo.save(newHistory);
+};
+
+export const isPasswordReused = async (employee_id: string, newPassword: string): Promise<boolean> => {
+    const recentPasswords = await passwordHistoryRepo.find({
+        where: {
+            employee: { id: employee_id }
+        },
+        order: {
+            created_at: 'DESC'
+        },
+        take: 5 // Check last 5 passwords
     });
 
-    // Remove old entries beyond the limit
-    const oldEntries = await historyRepo.find({
-      where: { employeeId },
-      order: { created_at: 'DESC' },
-      skip: this.HISTORY_LIMIT
-    });
-
-    if (oldEntries.length > 0) {
-      await historyRepo.remove(oldEntries);
-    }
-  }
-
-  static async isPasswordReused(
-    employeeId: string,
-    newPassword: string
-  ): Promise<boolean> {
-    const historyRepo = AppDataSource.getRepository(PasswordHistory);
-    const minDate = new Date();
-    minDate.setDate(minDate.getDate() - this.HISTORY_DAYS);
-
-    // Get recent password history
-    const recentPasswords = await historyRepo.find({
-      where: {
-        employeeId,
-        created_at: MoreThanOrEqual(minDate)
-      },
-      take: this.HISTORY_LIMIT,
-      order: { created_at: 'DESC' }
-    });
-
-    // Check if new password matches any recent passwords
-    for (const entry of recentPasswords) {
-      if (await compare(newPassword, entry.password_hash)) {
-        return true;
-      }
+    for (const history of recentPasswords) {
+        if (await compare(newPassword, history.password_hash)) {
+            return true;
+        }
     }
 
     return false;
-  }
-} 
+};
+
+export const cleanupOldPasswords = async (employee_id: string): Promise<void> => {
+    const oldPasswords = await passwordHistoryRepo.find({
+        where: {
+            employee: { id: employee_id }
+        },
+        order: {
+            created_at: 'DESC'
+        },
+        skip: 5 // Keep only last 5 passwords
+    });
+
+    if (oldPasswords.length > 0) {
+        await passwordHistoryRepo.remove(oldPasswords);
+    }
+}; 

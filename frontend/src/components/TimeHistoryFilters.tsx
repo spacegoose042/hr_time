@@ -10,20 +10,19 @@ import { DatePicker } from '@mui/x-date-pickers';
 import ClearIcon from '@mui/icons-material/Clear';
 
 interface TimeHistoryFiltersProps {
-  filters: {
-    startDate: Date | null;
-    endDate: Date | null;
-    status: string;
-    searchTerm: string;
-  };
-  onFilterChange: (filters: Partial<TimeHistoryFiltersProps['filters']>) => void;
+  filters: TimeHistoryFilters;
+  onFilterChange: (filters: Partial<TimeHistoryFilters>) => void;
   onClearFilters: () => void;
+  availableProjects: string[];
+  availableTasks: string[];
 }
 
-export default function TimeHistoryFilters({ 
-  filters, 
-  onFilterChange, 
-  onClearFilters 
+export default function TimeHistoryFilters({
+  filters,
+  onFilterChange,
+  onClearFilters,
+  availableProjects,
+  availableTasks
 }: TimeHistoryFiltersProps) {
   return (
     <Box sx={{ mb: 2 }}>

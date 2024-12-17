@@ -1,12 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Employee } from './Employee';
 
-@Entity()
+@Entity('password_history')
 export class PasswordHistory {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => Employee, employee => employee.passwordHistory)
+    @ManyToOne(() => Employee, employee => employee.passwordHistory, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'employee_id' })
     employee: Employee;
 
     @Column()

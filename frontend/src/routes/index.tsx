@@ -5,7 +5,42 @@ import { useState, useEffect } from 'react';
 import { timeEntryService } from '../services/timeEntryService';
 import { TimeEntry } from '../components/TimeHistory';
 import { GridPaginationModel } from '@mui/x-data-grid';
-import { TimeHistoryFilters } from '../components/TimeHistory';
+import { TimeHistoryFilters } from '../types/timeEntry';
+
+// Initialize with proper default values
+const defaultFilters: TimeHistoryFilters = {
+  startDate: null,
+  endDate: null,
+  status: '',
+  searchTerm: '',
+  minDuration: null,
+  maxDuration: null,
+  hasBreak: null,
+  project: '',
+  task: '',
+  durationRange: [0, 24],
+  hasNotes: null,
+  projects: [],
+  tasks: [],
+  dateRange: 'today'
+};
+
+export function useTimeHistoryFilters() {
+  const [filters, setFilters] = useState<TimeHistoryFilters>(defaultFilters);
+
+  const updateFilters = (newFilters: Partial<TimeHistoryFilters>) => {
+    setFilters(prev => ({
+      ...prev,
+      ...newFilters
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters(defaultFilters);
+  };
+
+  return { filters, updateFilters, clearFilters };
+}
 
 export default function AppRoutes() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);

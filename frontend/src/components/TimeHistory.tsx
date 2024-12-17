@@ -400,17 +400,17 @@ interface TimeHistoryProps {
   weekTotal: string;
   totalCount: number;
   isLoading: boolean;
-  error: string | null;
-  page: number;
-  limit: number;
-  onPageChange: (page: number) => void;
-  onLimitChange: (limit: number) => void;
   onPaginationModelChange: (model: GridPaginationModel) => void;
-  filters: TimeHistoryFilters;
-  onFilterChange: (filters: Partial<TimeHistoryFilters>) => void;
-  onClearFilters: () => void;
-  userRole?: 'employee' | 'manager' | 'admin';
-  auditLogs?: AuditLog[];
+  onFilterChange: (filters: TimeHistoryFilters) => void;
+  onBulkApprove: (ids: string[]) => void;
+  onBulkReject: (ids: string[]) => void;
+  onBulkDelete: (ids: string[]) => void;
+  onBulkSubmit: (ids: string[]) => void;
+  onBulkPrint: (ids: string[]) => void;
+  onBulkEmail: (ids: string[]) => void;
+  onBulkArchive: (ids: string[]) => void;
+  userRole: string;
+  paginationModel: GridPaginationModel;
 }
 
 export default function TimeHistory({
@@ -419,17 +419,17 @@ export default function TimeHistory({
   weekTotal,
   totalCount,
   isLoading,
-  error,
-  page,
-  limit,
-  onPageChange,
-  onLimitChange,
   onPaginationModelChange,
-  filters,
   onFilterChange,
-  onClearFilters,
+  onBulkApprove,
+  onBulkReject,
+  onBulkDelete,
+  onBulkSubmit,
+  onBulkPrint,
+  onBulkEmail,
+  onBulkArchive,
   userRole,
-  auditLogs
+  paginationModel
 }: TimeHistoryProps) {
   const columns = createColumns(undefined, undefined, undefined, userRole);
   const [selectedEntries, setSelectedEntries] = useState<TimeEntry[]>([]);
@@ -564,16 +564,14 @@ export default function TimeHistory({
           rows={entries}
           columns={columns}
           loading={isLoading}
-          pageSizeOptions={[5, 10, 25, 50]}
-          page={page - 1}
-          pageSize={limit}
-          onPageChange={(newPage) => onPageChange(newPage + 1)}
-          onPageSizeChange={onLimitChange}
+          paginationModel={paginationModel}
+          onPaginationModelChange={onPaginationModelChange}
           rowCount={totalCount}
           paginationMode="server"
-          autoHeight
+          pageSizeOptions={[5, 10, 25, 50]}
+          checkboxSelection
           disableRowSelectionOnClick
-          getRowClassName={getRowStyle}
+          onRowSelectionModelChange={handleSelectionChange}
           sx={{
             '& .in-progress': {
               bgcolor: '#f5f5f5',
@@ -591,8 +589,6 @@ export default function TimeHistory({
           slots={{
             toolbar: CustomToolbar
           }}
-          checkboxSelection
-          onRowSelectionModelChange={handleSelectionChange}
         />
         {selectedEntries.length > 0 && (
           <SpeedDial

@@ -531,21 +531,23 @@ const TimeClock: React.FC = () => {
       </Grid>
 
       <Grid item xs={12}>
-        <TimeHistory 
+        <TimeHistory
           entries={timeHistory.entries}
           todayTotal={timeHistory.todayTotal}
           weekTotal={timeHistory.weekTotal}
           totalCount={timeHistory.totalCount}
-          paginationModel={paginationModel}
           isLoading={isHistoryLoading}
           onPaginationModelChange={setPaginationModel}
-          filters={filters}
           onFilterChange={handleFilterChange}
-          onClearFilters={handleClearFilters}
-          onEditEntry={handleEditEntry}
-          onApproveEntry={handleApproveEntry}
-          onRejectEntry={handleRejectEntry}
+          onBulkApprove={handleBulkApprove}
+          onBulkReject={handleBulkReject}
+          onBulkDelete={handleBulkDelete}
+          onBulkSubmit={handleBulkSubmit}
+          onBulkPrint={handleBulkPrint}
+          onBulkEmail={handleBulkEmail}
+          onBulkArchive={handleBulkArchive}
           userRole="manager" // Or get from auth context
+          paginationModel={paginationModel}
         />
       </Grid>
 
