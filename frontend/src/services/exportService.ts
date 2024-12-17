@@ -137,8 +137,9 @@ const formatEntriesForExport = (entries: TimeEntry[]): ExportRow[] => {
   }));
 };
 
-const exportToExcel = (data: ExportRow[], filename: string) => {
-  const worksheet = XLSX.utils.json_to_sheet(data);
+const exportToExcel = (data: TimeEntry[], filename: string) => {
+  const formattedData = formatEntriesForExport(data);
+  const worksheet = XLSX.utils.json_to_sheet(formattedData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Time Entries');
   XLSX.writeFile(workbook, `${filename}.xlsx`);
@@ -151,11 +152,12 @@ export const exportToCSV = (data: TimeEntry[], filename?: string) => {
   saveAs(blob, filename || `time-entries-${new Date().toISOString().split('T')[0]}.csv`);
 };
 
-const exportToPDF = (data: ExportRow[], filename: string) => {
+const exportToPDF = (data: TimeEntry[], filename: string) => {
+  const formattedData = formatEntriesForExport(data);
   const doc = new jsPDF();
   doc.autoTable({
-    head: [Object.keys(data[0])],
-    body: data.map(Object.values),
+    head: [Object.keys(formattedData[0])],
+    body: formattedData.map(Object.values),
     styles: { fontSize: 8 },
     headStyles: { fillColor: [66, 66, 66] }
   });
